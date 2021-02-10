@@ -1,5 +1,7 @@
 let root = document.querySelector("#root");
 let ship_height = 45;
+let ship_width = 55;
+let max_asteroid_length = 50;
 let frame_rate = 60;
 //TODO remake into keyboard control
 function round_to(n, digits) {
@@ -66,7 +68,7 @@ class Ship {
     this.canvas_width = canvas_width;
     this.canvas_height = canvas_height;
     this.ship_height = ship_height;
-    this.ship_width = 55;
+    this.ship_width = ship_width;
     this.facing_top = facing_top;
     this.speed = 6.5;
     this.max_speed = 10;
@@ -222,10 +224,13 @@ class Ship {
 
 class Asteroid{
   
-  constructor(ctx, center_x, center_y){
-    this.min_radius = 20;
+  constructor(ctx, center_x, center_y, canvas_width, canvas_height){
     
-    this.max_radius = 30;
+    this.canvas_width = canvas_width;
+    this.canvas_height = canvas_height;
+    this.speed = 3;
+    this.max_radius = max_asteroid_length / 2;
+    this.min_radius = this.max_radius - 8;
     this.center_x = center_x;
     this.center_y = center_y;
     this.ctx = ctx;
@@ -234,6 +239,16 @@ class Asteroid{
     this.generate_points();
     
   }
+
+  is_out_of_bounds = () => {
+    if(this.points[0].y > this.canvas_height){
+      return true;
+    }
+    else{
+      return false;
+    }
+  }
+
   generate_points = () => {
     let point = {
      x: this.center_x,
@@ -255,6 +270,23 @@ class Asteroid{
       y: this.center_y
     }
     this.points.push(point);
+
+  }
+
+  adjust_points = (adjust_by) => {
+    for(let i = 0; i < this.points.length; i += 1){
+      this.points[i].y += adjust_by;
+    }
+  }
+
+  move = () => {
+    this.center_y += this.speed;
+    this.adjust_points(this.speed);
+  }
+
+  on_frame = () => { 
+    this.move();
+    this.draw();
 
   }
 
@@ -376,6 +408,7 @@ class Asteroid{
     this.ctx.fill(asteroid_path);
     this.ctx.restore();
   }
+
 }
 
 
@@ -428,6 +461,9 @@ class Game_field {
     let player_ship_color = "hsl(184, 100%, 50%)";
     this.canvas_width = this.canvas.width;
     this.canvas_height = this.canvas.height;
+    this.max_asteroids_on_field = 2;
+    this.min_x_distance_between_asteroids = ship_width + 25;
+    this.asteroid_list = [];
     this.player_object = new Player_ship(
       this.ctx,
       this.canvas_width,
@@ -435,22 +471,92 @@ class Game_field {
       player_ship_color,
       true
     );
-    this.asteroid = new Asteroid(this.ctx, 100, 100);
+    this.generate_asteroids();
     // in order: up, right, down, left, shoot
-    this.input_array = [0, 0, 0, 0, 0]
+    this.input_array = [0, 0, 0, 0, 0];
     //this.bind_mouse_move_on_canvas();
     this.bind_keys();
     this.start_frame_interval();
   }
+
+  dispose_asteroids = () => {
+    
+    console.log(this.asteroid_list);
+    while(true){
+      let found = false;
+      for(let i = 0; i < this.asteroid_list.length; i += 1){
+        let asteroid_object = this.asteroid_list[i];
+        let is_out_of_bounds = asteroid_object.is_out_of_bounds();
+        if(is_out_of_bounds === true){
+          this.asteroid_list.splice(i, 1);
+          found = true;
+          break;
+        }
+      }
+      if(found === false){
+        break;
+      }
+    }
+    this.generate_asteroids();
+    
+  }
+
+  other_asteroids_close = (x) => {
+    
+    for(let i = 0; i < this.asteroid_list.length; i += 1){
+      let asteroid_object = this.asteroid_list[i]
+      let left_boundary = asteroid_object.points[3].x - this.min_x_distance_between_asteroids;
+      let right_boundary = asteroid_object.points[1].x + this.min_x_distance_between_asteroids;
+      console.log(asteroid_object, left_boundary, right_boundary);
+      if(x >= left_boundary && x <= right_boundary){
+        return true;
+      }
+      
+    }
+    return false;
+  }
+
+  generate_asteroids = () => {
+    let x_distance_increment = 10;
+   
+      for(let i = this.asteroid_list.length; i < this.max_asteroids_on_field; i += 1){
+        let rand_x = get_random_int(0 + max_asteroid_length, this.canvas_width - max_asteroid_length);
+        while(this.other_asteroids_close(rand_x) === true){
+          let last_asteroid = this.asteroid_list[this.asteroid_list.length - 1];
+          if(last_asteroid.center_x < this.canvas_width / 2){
+            rand_x += x_distance_increment;
+          }
+          else{
+            rand_x -= x_distance_increment;
+          }
+          
+        }
+        let y = -max_asteroid_length;
+        let new_asteroid = new Asteroid(this.ctx, rand_x, y, this.canvas_width, this.canvas_height);
+        this.asteroid_list.push(new_asteroid);
+      }
+      
+    
+  }
+
+  stop_frames = () => {
+    clearInterval(this.frame_interval);
+  }
+
   on_frame = () => {
     this.ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
     this.player_object.on_frame(this.input_array);
-    this.asteroid.draw();
+    this.asteroid_list.forEach(asteroid => {
+      asteroid.on_frame();
+    });
+    this.dispose_asteroids();
   }
+
   start_frame_interval = () => {
     let ms = round_to(1000 / frame_rate, 1);
     this.frame_interval = setInterval(this.on_frame, ms);
   };
+
   bind_keys = () => {
     window.onkeydown = (ev) => {
       let key = ev.key;
@@ -469,6 +575,9 @@ class Game_field {
       }
       if(key === "space"){
         this.input_array[4] = 1;
+      }
+      if(key === "1"){
+        this.stop_frames();
       }
     }
     window.onkeyup = (ev) => {
