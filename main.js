@@ -26,6 +26,30 @@ function init_canvas() {
   root.innerHTML = canv_html;
 }
 
+function find_min_index(array){
+  let min = Infinity;
+  let min_index;
+  for(let i = 0; i < array.length; i += 1){
+    if(array[i] < min){
+      min = array[i];
+      min_index = i;
+    }
+  }
+  return min_index
+}
+
+function calculate_distance_between_points(point_1, point_2){
+  let distance_to_point = Math.sqrt((Math.pow((point_1.x - point_2.x), 2) + Math.pow((point_1.y - point_2.y), 2)));
+  return distance_to_point;
+}
+
+//gives random integer between min(inclusive) and max(inclusive)
+function get_random_int(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 function getMousePos(evt, canv) {
   var rect = canv.getBoundingClientRect();
   return {
@@ -195,6 +219,166 @@ class Ship {
   }
 }
 
+
+class Asteroid{
+  
+  constructor(ctx, center_x, center_y){
+    this.min_radius = 20;
+    
+    this.max_radius = 30;
+    this.center_x = center_x;
+    this.center_y = center_y;
+    this.ctx = ctx;
+    this.fill_color = "hsl(0, 2%, 28%)";
+    this.points = [];
+    this.generate_points();
+    
+  }
+  generate_points = () => {
+    let point = {
+     x: this.center_x,
+     y: get_random_int(this.center_y - this.min_radius, this.center_y - this.max_radius)
+    }
+    this.points.push(point);
+    point = {
+      x: get_random_int(this.center_x + this.min_radius, this.center_x + this.max_radius),
+      y: this.center_y
+    }
+    this.points.push(point);
+    point = {
+      x: this.center_x,
+      y: get_random_int(this.center_y + this.min_radius, this.center_y + this.max_radius)
+    }
+    this.points.push(point);
+    point = {
+      x: get_random_int(this.center_x - this.min_radius, this.center_x - this.max_radius),
+      y: this.center_y
+    }
+    this.points.push(point);
+
+  }
+
+  /*
+  generate_points = () => {
+    for(let i = 0; i < this.number_on_left; i += 1){
+      let proper_point = false;
+      while(proper_point === false){
+        console.log("generate_points_while_loop");
+        let point_x = get_random_int(this.center_x - this.max_radius, this.center_x - this.min_radius);
+        let point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
+        while(Math.abs(this.center_y - point_y) < this.min_radius){
+          point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
+        }
+        let cont_loop = false;
+        let point = {
+          x: point_x,
+          y: point_y
+        }
+        for(let j = 0; j < this.points.length; j += 1){
+          let scoped_point = this.points[j];
+          let distance_to_point = calculate_distance_between_points(scoped_point, point );
+          if(distance_to_point < this.radius_between_points){
+            cont_loop = true;
+            break;
+          }
+        }
+        if(cont_loop === true){
+          continue;
+        }
+        
+        this.points.push(point);
+        
+        proper_point = true;
+      }
+      
+      
+    }
+    for(let i = 0; i < this.number_on_right; i += 1){
+      let proper_point = false;
+      while(proper_point === false){
+        let point_x = get_random_int(this.center_x + this.min_radius, this.center_x + this.max_radius);
+        let point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
+        console.log("generate_points_while_loop");
+        while(Math.abs(this.center_y - point_y) < this.min_radius){
+          point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
+        }
+        let cont_loop = false;
+        for(let j = 0; j < this.points.length; j += 1){
+          let scoped_point = this.points[j];
+          let distance_to_point = Math.sqrt((Math.pow((point_x - scoped_point.x), 2) + Math.pow((point_y - scoped_point.y), 2)));
+          if(distance_to_point < this.radius_between_points){
+            cont_loop = true;
+            break;
+          }
+        }
+        if(cont_loop === true){
+          continue;
+        }
+        let point = {
+          x: point_x,
+          y: point_y
+        }
+        this.points.push(point);
+        
+        proper_point = true;
+      }
+      
+      
+    }
+    console.log(this.points);
+  }
+  generate_draw_order = () => {
+    let draw_order = [0];
+    
+    while(draw_order.length != this.number_of_points){
+      let current_point = this.points[draw_order[draw_order.length - 1]];
+      let distances = [];
+      let points = [];
+      for(let i = 0; i < this.points.length; i += 1){
+        if(draw_order.includes(i) === false){
+          points.push(i);
+        }
+      }
+      for(let i = 0; i < points.length; i += 1){
+        let distance_to = calculate_distance_between_points(current_point, this.points[points[i]]);
+        distances.push(distance_to);
+      }
+      let min_distance_index = find_min_index(distances);
+      
+      draw_order.push(points[min_distance_index]);
+    }
+    this.draw_order = draw_order;
+    console.log(this.draw_order);
+  }
+  */
+
+  draw = () => {
+    let asteroid_path = new Path2D();
+
+    /*
+    let starting_point = this.points[this.draw_order[0]];
+    asteroid_path.moveTo(starting_point.x, starting_point.y);
+    for(let i = 1; i < this.draw_order.length; i += 1){
+      let index = this.draw_order[i];
+      let point = this.points[index];
+      asteroid_path.lineTo(point.x, point.y);
+    }
+    asteroid_path.closePath();
+    */
+    asteroid_path.moveTo(this.points[0].x, this.points[0].y);
+    for(let i = 0; i < this.points.length; i += 1){
+      let point = this.points[i];
+      asteroid_path.lineTo(point.x, point.y);
+    }
+    asteroid_path.closePath();
+    this.ctx.save();
+    this.ctx.fillStyle = this.fill_color;
+    this.ctx.fill(asteroid_path);
+    this.ctx.restore();
+  }
+}
+
+
 class Player_ship extends Ship{
   constructor(ctx, canvas_width, canvas_height, fill_color, facing_top){
     super(ctx, canvas_width, canvas_height, fill_color, facing_top);
@@ -251,6 +435,7 @@ class Game_field {
       player_ship_color,
       true
     );
+    this.asteroid = new Asteroid(this.ctx, 100, 100);
     // in order: up, right, down, left, shoot
     this.input_array = [0, 0, 0, 0, 0]
     //this.bind_mouse_move_on_canvas();
@@ -260,7 +445,7 @@ class Game_field {
   on_frame = () => {
     this.ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
     this.player_object.on_frame(this.input_array);
-    
+    this.asteroid.draw();
   }
   start_frame_interval = () => {
     let ms = round_to(1000 / frame_rate, 1);
