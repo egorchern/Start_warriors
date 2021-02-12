@@ -78,7 +78,7 @@ class Ship {
     this.left_wing_percentage = 0.2;
     this.radius = this.ship_height * 0.5 * (1 - this.wing_height_percentage);
     this.top_part_hitboxes_number = 3;
-    this.hitboxes_number_per_wing = 5;
+    this.hitboxes_number_per_wing = 6;
     this.speed = 6.5;
     this.max_speed = 10;
     this.acceleration = 0.1;
@@ -389,7 +389,7 @@ class Ship {
     rest_of_ship.lineTo(this.points[6].x, this.points[6].y);
     rest_of_ship.lineTo(this.points[2].x, this.points[2].y);
     ctx.fill(rest_of_ship);
-    this.stroke_hitboxes();
+    //this.stroke_hitboxes();
     ctx.restore();
   }
 
@@ -414,8 +414,10 @@ class Asteroid{
     
     this.fill_color = "hsl(0, 2%, 28%)";
     this.points = [];
+    this.hitboxes = [];
+    this.number_of_hitboxes_per_half = 7;
     this.generate_points();
-    
+    this.generate_hitboxes();
   }
 
   is_out_of_bounds () {
@@ -425,6 +427,12 @@ class Asteroid{
     else{
       return false;
     }
+  }
+
+  move_down(){
+    this.center_y += this.speed;
+    this.adjust_points("down");
+    this.adjust_hitboxes("down");
   }
 
   generate_points (){
@@ -451,37 +459,142 @@ class Asteroid{
 
   }
 
-  adjust_points (adjust_by){
-    for(let i = 0; i < this.points.length; i += 1){
-      this.points[i].y += adjust_by;
+  generate_hitboxes(){
+    let half_multiplier_scale = round_to(1 / this.number_of_hitboxes_per_half, 2);
+    let half_multiplier = 0;
+    let x_dist_left = Math.abs(this.center_x - this.points[3].x);
+    let x_dist_right = Math.abs(this.center_x - this.points[1].x);
+    let y_dist = Math.abs(this.center_y - this.points[2].y);
+    let x_reference = this.points[2].x;
+    let y_reference = this.points[2].y;
+    for(let i = 0; i < this.number_of_hitboxes_per_half; i += 1){
+      let bottom = y_reference - y_dist * half_multiplier;
+      half_multiplier += half_multiplier_scale;
+      half_multiplier = round_to(half_multiplier, 2);
+      let top = y_reference - y_dist * half_multiplier;
+      let left = x_reference - x_dist_left * half_multiplier;
+      let right = x_reference + x_dist_right * half_multiplier;
+      let hitbox = {
+        left: left,
+        right: right,
+        top: top,
+        bottom: bottom
+      }
+      this.hitboxes.push(hitbox);
+    }
+    half_multiplier = 0;
+    y_dist = Math.abs(this.center_y - this.points[0].y);
+    x_reference = this.points[0].x;
+    y_reference = this.points[0].y;
+    for(let i = 0; i < this.number_of_hitboxes_per_half; i += 1){
+      let top = y_reference + y_dist * half_multiplier;
+      half_multiplier += half_multiplier_scale;
+      half_multiplier = round_to(half_multiplier, 2);
+      let bottom = y_reference + y_dist * half_multiplier;
+      let left = x_reference - x_dist_left * half_multiplier;
+      let right = x_reference + x_dist_right * half_multiplier;
+      let hitbox = {
+        left: left,
+        right: right,
+        top: top,
+        bottom: bottom
+      }
+      this.hitboxes.push(hitbox);
+    }
+  }
+  
+  
+
+  adjust_hitboxes (direction) {
+    let coordinate, amount;
+    switch(direction){
+      case ("up"):
+        coordinate = "y";
+        amount = -this.speed;
+        break;
+      case ("right"):
+        coordinate = "x";
+        amount = this.speed;
+        break;
+      case ("down"):
+        coordinate = "y";
+        amount = this.speed;
+        break;
+      case ("left"):
+        coordinate = "x";
+        amount = -this.speed;
+        break;
+    }
+
+    for(let i = 0; i < this.hitboxes.length; i += 1){
+      let current_hitbox = this.hitboxes[i];
+      if(coordinate === "x"){
+        current_hitbox.left += amount;
+        current_hitbox.right += amount;
+
+      }
+      else{
+        current_hitbox.bottom += amount;
+        current_hitbox.top += amount;
+      }
+      this.hitboxes[i] = current_hitbox;
     }
   }
 
-  move (){
-    this.center_y += this.speed;
-    this.adjust_points(this.speed);
+  adjust_points (direction) {
+    let coordinate, amount;
+    switch(direction){
+      case ("up"):
+        coordinate = "y";
+        amount = -this.speed;
+        break;
+      case ("right"):
+        coordinate = "x";
+        amount = this.speed;
+        break;
+      case ("down"):
+        coordinate = "y";
+        amount = this.speed;
+        break;
+      case ("left"):
+        coordinate = "x";
+        amount = -this.speed;
+        break;
+    }
+
+    for(let i = 0; i < this.points.length; i += 1){
+      let new_amount = this.points[i][coordinate] + amount;
+      this.points[i][coordinate] = new_amount;
+    }
+  }
+  
+
+
+  stroke_hitboxes(){
+    ctx.save();
+    for(let i = 0; i < this.hitboxes.length; i += 1){
+      let current_hitbox = this.hitboxes[i];
+      let hitbox_path = new Path2D();
+      hitbox_path.moveTo(current_hitbox.left, current_hitbox.bottom);
+      hitbox_path.lineTo(current_hitbox.left, current_hitbox.top);
+      hitbox_path.lineTo(current_hitbox.right, current_hitbox.top);
+      hitbox_path.lineTo(current_hitbox.right, current_hitbox.bottom);
+      hitbox_path.closePath();
+      ctx.stroke(hitbox_path);
+      
+    }
+    ctx.restore();
   }
 
   on_frame(){ 
-    this.move();
+    this.move_down();
     this.draw();
 
   }
 
-  
   draw () {
+    
     let asteroid_path = new Path2D();
-
-    /*
-    let starting_point = this.points[this.draw_order[0]];
-    asteroid_path.moveTo(starting_point.x, starting_point.y);
-    for(let i = 1; i < this.draw_order.length; i += 1){
-      let index = this.draw_order[i];
-      let point = this.points[index];
-      asteroid_path.lineTo(point.x, point.y);
-    }
-    asteroid_path.closePath();
-    */
     asteroid_path.moveTo(this.points[0].x, this.points[0].y);
     for(let i = 0; i < this.points.length; i += 1){
       let point = this.points[i];
@@ -491,6 +604,7 @@ class Asteroid{
     ctx.save();
     ctx.fillStyle = this.fill_color;
     ctx.fill(asteroid_path);
+    //this.stroke_hitboxes();
     ctx.restore();
   }
 
@@ -589,6 +703,16 @@ class Game_field {
     
   }
 
+  player_ship_collides_with_asteroids(){
+    for(let i = 0; i < this.asteroid_list.length; i += 1){
+      let collide_bool = this.hitboxes_collide(this.player_object.hitboxes, this.asteroid_list[i].hitboxes);
+      if(collide_bool === true){
+        return true;
+      }
+    }
+    return false;
+  }
+
   other_asteroids_close  (x) {
     
     for(let i = 0; i < this.asteroid_list.length; i += 1){
@@ -627,6 +751,32 @@ class Game_field {
     
   }
 
+  hitboxes_collide(hitbox_list_1, hitbox_list_2){
+    for(let i = 0; i < hitbox_list_1.length; i += 1){
+      let hitbox_1 = hitbox_list_1[i];
+      for(let j = 0; j < hitbox_list_2.length; j += 1){
+        let hitbox_2 = hitbox_list_2[j];
+        if(hitbox_1.top >= hitbox_2.top && hitbox_1.top <= hitbox_2.bottom && hitbox_1.left >= hitbox_2.left && hitbox_1.right <= hitbox_2.right){
+          
+          return true;
+        }
+        if(hitbox_1.right <= hitbox_2.right && hitbox_1.right >= hitbox_2.left && hitbox_1.top >= hitbox_2.top && hitbox_1.bottom <= hitbox_2.bottom){
+          
+          return true;
+        }
+        if(hitbox_1.left <= hitbox_2.right && hitbox_1.left >= hitbox_2.left && hitbox_1.top >= hitbox_2.top && hitbox_1.bottom <= hitbox_2.bottom){
+          
+          return true;
+        }
+        if(hitbox_1.bottom >= hitbox_2.top && hitbox_1.bottom <= hitbox_2.bottom && hitbox_1.left >= hitbox_2.left && hitbox_1.right <= hitbox_2.right){
+          
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   stop_frames () {
     clearInterval(this.frame_interval);
   }
@@ -638,6 +788,11 @@ class Game_field {
       asteroid.on_frame();
     });
     this.dispose_asteroids();
+    let player_ship_collides_with_asteroids = this.player_ship_collides_with_asteroids();
+    console.log(player_ship_collides_with_asteroids);
+    if(player_ship_collides_with_asteroids === true){
+      this.stop_frames();
+    }
   }
 
   start_frame_interval () {
