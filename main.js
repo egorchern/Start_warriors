@@ -3,6 +3,7 @@ let ship_height = 45;
 let ship_width = 55;
 let max_asteroid_length = 50;
 let frame_rate = 60;
+let canvas, ctx;
 //TODO remake into keyboard control
 function round_to(n, digits) {
   if (digits === undefined) {
@@ -26,6 +27,8 @@ function init_canvas() {
     </canvas>
     `;
   root.innerHTML = canv_html;
+  canvas = document.querySelector("#canvas");
+  ctx = canvas.getContext("2d");
 }
 
 function find_min_index(array){
@@ -61,8 +64,8 @@ function getMousePos(evt, canv) {
 }
 
 class Ship {
-  constructor(ctx, canvas_width, canvas_height, fill_color, facing_top) {
-    this.ctx = ctx;
+  constructor(canvas_width, canvas_height, fill_color, facing_top) {
+    
     this.center_x = 0;
     this.center_y = 0;
     this.canvas_width = canvas_width;
@@ -70,60 +73,27 @@ class Ship {
     this.ship_height = ship_height;
     this.ship_width = ship_width;
     this.facing_top = facing_top;
+    this.top_part_width_percentage = 0.3;
+    this.wing_height_percentage = 0.65;
+    this.left_wing_percentage = 0.2;
+    this.radius = this.ship_height * 0.5 * (1 - this.wing_height_percentage);
+    this.top_part_hitboxes_number = 3;
+    this.hitboxes_number_per_wing = 5;
     this.speed = 6.5;
     this.max_speed = 10;
     this.acceleration = 0.1;
     this.fill_color = fill_color;
+    this.hitboxes = [];
+    this.points = [];
+    
   }
 
-  touches_boundary = (x, y) => {
-    let left = x - this.ship_width / 2;
-    let right = x + this.ship_width / 2;
-    let top = y - this.ship_height / 2;
-    let bottom = y + this.ship_height / 2;
-    if(left < 0 || right > this.canvas_width || top < 0 || bottom > this.canvas_height){
-      return true;
-    }
-    else{
-      return false;
-    }
-  }
-  /*
-  set_target = (x, y) => {
-    //this.speed = 5;
-    this.target_x = x;
-    this.target_y = y;
-  }
-  
-  move_to_target = () => {
+  generate_points () {
     
-    if(this.center_x < this.target_x - this.speed){
-      this.center_x += this.speed;
-    }
-    else if(this.center_x > this.target_x + this.speed){
-      this.center_x -= this.speed;
-    }
-    if(this.center_y < this.target_y - this.speed){
-      this.center_y += this.speed;
-    }
-    else if(this.center_y > this.target_y + this.speed){
-      this.center_y -= this.speed;
-    }
-    
-  }
-  */
-  draw() {
-    this.ctx.save();
-    this.ctx.fillStyle = this.fill_color;
-    let top_part_width_percentage = 0.3;
-    let wing_height_percentage = 0.65;
-    let left_wing_percentage = 0.2;
-    let top_part = new Path2D();
-    let points;
     if(this.facing_top === true){
-      points = [
+      this.points = [
         {
-          x: this.center_x - this.ship_width * 0.5 * top_part_width_percentage,
+          x: this.center_x - this.ship_width * 0.5 * this.top_part_width_percentage,
           y: this.center_y,
         },
         {
@@ -131,31 +101,31 @@ class Ship {
           y: this.center_y - this.ship_height / 2,
         },
         {
-          x: this.center_x + this.ship_width * 0.5 * top_part_width_percentage,
+          x: this.center_x + this.ship_width * 0.5 * this.top_part_width_percentage,
           y: this.center_y,
         },
         {
             x: this.center_x - this.ship_width * 0.5,
-            y: this.center_y + this.ship_height * 0.5 * wing_height_percentage
+            y: this.center_y + this.ship_height * 0.5 * this.wing_height_percentage
         },
         {
-            x: this.center_x - this.ship_width * 0.5 * left_wing_percentage,
-            y: this.center_y + this.ship_height * 0.5 * wing_height_percentage
+            x: this.center_x - this.ship_width * 0.5 * this.left_wing_percentage,
+            y: this.center_y + this.ship_height * 0.5 * this.wing_height_percentage
         },
         {
           x: this.center_x,
-          y: this.center_y + this.ship_height * 0.5 * wing_height_percentage
+          y: this.center_y + this.ship_height * 0.5 * this.wing_height_percentage
         },
         {
           x: this.center_x + this.ship_width * 0.5,
-          y: this.center_y + this.ship_height * 0.5 * wing_height_percentage
+          y: this.center_y + this.ship_height * 0.5 * this.wing_height_percentage
         }
       ];
     }
     else{
-      points =  [
+      this.points =  [
         {
-          x: this.center_x - this.ship_width * 0.5 * top_part_width_percentage,
+          x: this.center_x - this.ship_width * 0.5 * this.top_part_width_percentage,
           y: this.center_y,
         },
         {
@@ -163,59 +133,267 @@ class Ship {
           y: this.center_y + this.ship_height / 2,
         },
         {
-          x: this.center_x + this.ship_width * 0.5 * top_part_width_percentage,
+          x: this.center_x + this.ship_width * 0.5 * this.top_part_width_percentage,
           y: this.center_y,
         },
         {
             x: this.center_x - this.ship_width * 0.5,
-            y: this.center_y - this.ship_height * 0.5 * wing_height_percentage
+            y: this.center_y - this.ship_height * 0.5 * this.wing_height_percentage
         },
         {
-            x: this.center_x - this.ship_width * 0.5 * left_wing_percentage,
-            y: this.center_y - this.ship_height * 0.5 * wing_height_percentage
+            x: this.center_x - this.ship_width * 0.5 * this.left_wing_percentage,
+            y: this.center_y - this.ship_height * 0.5 * this.wing_height_percentage
         },
         {
           x: this.center_x,
-          y: this.center_y - this.ship_height * 0.5 * wing_height_percentage
+          y: this.center_y - this.ship_height * 0.5 * this.wing_height_percentage
         },
         {
           x: this.center_x + this.ship_width * 0.5,
-          y: this.center_y - this.ship_height * 0.5 * wing_height_percentage
+          y: this.center_y - this.ship_height * 0.5 * this.wing_height_percentage
         }
       ];
     }
-    top_part.moveTo(points[0].x, points[0].y);
-    top_part.lineTo(points[1].x, points[1].y);
-    top_part.lineTo(points[2].x, points[2].y);
-    top_part.closePath();
-    this.ctx.fill(top_part);
-    let rest_of_ship = new Path2D();
-    rest_of_ship.moveTo(
-      points[0].x,
-      points[0].y
-    );
-    rest_of_ship.lineTo(
-      points[3].x,
-      points[3].y
-    );
-    rest_of_ship.lineTo(
-      points[4].x,
-      points[4].y
-    );
-    //rest_of_ship.moveTo(points[5].x, points[5].y);
-    if(this.facing_top === true){
-      rest_of_ship.arc(points[5].x, points[5].y, this.ship_height * 0.5 * (1 - wing_height_percentage),0, Math.PI);
+  }
+
+  generate_hitboxes (){
+    let top_part_multiplier_scale = round_to(1 / this.top_part_hitboxes_number, 2);
+    let top_part_multiplier = 0;
+    let x_dist = Math.abs(this.points[0].x - this.points[1].x);
+    let y_dist = Math.abs(this.points[0].y - this.points[1].y);
+    let left_reference = this.points[0].x;
+    
+    let right_reference = this.points[2].x;
+    let bottom_reference = this.points[0].y;
+    
+    for(let i = 0; i < this.top_part_hitboxes_number; i += 1){
+      let left = left_reference + x_dist * top_part_multiplier;
+      let right = right_reference - x_dist * top_part_multiplier;
+      let bottom = bottom_reference - y_dist * top_part_multiplier;
+      top_part_multiplier += top_part_multiplier_scale;
+      top_part_multiplier = round_to(top_part_multiplier, 2);
+      let top = bottom_reference - y_dist * top_part_multiplier
+      let hitbox = {
+        left: left,
+        right: right,
+        top: top,
+        bottom: bottom
+      }
+      this.hitboxes.push(hitbox);
+
+    }
+    let body_hitbox = {
+      left: left_reference,
+      right: right_reference,
+      top: bottom_reference,
+      bottom: this.points[3].y
+    }
+    this.hitboxes.push(body_hitbox);
+    let wing_multiplier_scale = round_to(1 / this.hitboxes_number_per_wing, 2);
+    let wing_multiplier = 0;
+    x_dist = this.ship_width / 2;
+    y_dist = Math.abs(this.points[2].y - this.points[3].y);
+    right_reference = left_reference;
+    let top_reference = bottom_reference;
+    bottom_reference = top_reference + y_dist;
+    for(let i = 0; i < this.hitboxes_number_per_wing; i += 1){ 
+      let right = right_reference - x_dist * wing_multiplier;
+      let bottom = bottom_reference;
+      let top = top_reference + y_dist * wing_multiplier;
+      wing_multiplier += wing_multiplier_scale;
+      wing_multiplier = round_to(wing_multiplier, 2);
+      let left = right_reference - x_dist * wing_multiplier;
+      let hitbox = {
+        left: left,
+        right: right,
+        top: top,
+        bottom: bottom
+      }
+      this.hitboxes.push(hitbox);
+    }
+    wing_multiplier = 0;
+    left_reference = this.points[2].x;
+    right_reference = left_reference;
+    for(let i = 0; i < this.hitboxes_number_per_wing; i += 1){ 
+      let left = right_reference + x_dist * wing_multiplier;
+      let bottom = bottom_reference;
+      let top = top_reference + y_dist * wing_multiplier;
+      wing_multiplier += wing_multiplier_scale;
+      wing_multiplier = round_to(wing_multiplier, 2);
+      let right = right_reference + x_dist * wing_multiplier;
+      let hitbox = {
+        left: left,
+        right: right,
+        top: top,
+        bottom: bottom
+      }
+      this.hitboxes.push(hitbox);
+    }
+    let bottom_part_hitbox = {
+      left: this.points[5].x - this.radius,
+      right: this.points[5].x + this.radius,
+      top: this.points[5].y,
+      bottom: this.points[5].y + this.radius
+    }
+    this.hitboxes.push(bottom_part_hitbox);
+  }
+
+  move_left () {
+    this.center_x -= this.speed;
+    this.adjust_points("left");
+    this.adjust_hitboxes("left");
+  }
+
+  move_up () {
+    this.center_y -= this.speed;
+    this.adjust_points("up");
+    this.adjust_hitboxes("up");
+  }
+
+  move_right ()  {
+    this.center_x += this.speed;
+    this.adjust_points("right");
+    this.adjust_hitboxes("right");
+  }
+
+  move_down ()  {
+    this.center_y += this.speed;
+    this.adjust_points("down");
+    this.adjust_hitboxes("down");
+  }
+
+  adjust_points (direction) {
+    let coordinate, amount;
+    switch(direction){
+      case ("up"):
+        coordinate = "y";
+        amount = -this.speed;
+        break;
+      case ("right"):
+        coordinate = "x";
+        amount = this.speed;
+        break;
+      case ("down"):
+        coordinate = "y";
+        amount = this.speed;
+        break;
+      case ("left"):
+        coordinate = "x";
+        amount = -this.speed;
+        break;
+    }
+
+    for(let i = 0; i < this.points.length; i += 1){
+      let new_amount = this.points[i][coordinate] + amount;
+      this.points[i][coordinate] = new_amount;
+    }
+  }
+
+  adjust_hitboxes (direction) {
+    let coordinate, amount;
+    switch(direction){
+      case ("up"):
+        coordinate = "y";
+        amount = -this.speed;
+        break;
+      case ("right"):
+        coordinate = "x";
+        amount = this.speed;
+        break;
+      case ("down"):
+        coordinate = "y";
+        amount = this.speed;
+        break;
+      case ("left"):
+        coordinate = "x";
+        amount = -this.speed;
+        break;
+    }
+
+    for(let i = 0; i < this.hitboxes.length; i += 1){
+      let current_hitbox = this.hitboxes[i];
+      if(coordinate === "x"){
+        current_hitbox.left += amount;
+        current_hitbox.right += amount;
+
+      }
+      else{
+        current_hitbox.bottom += amount;
+        current_hitbox.top += amount;
+      }
+      this.hitboxes[i] = current_hitbox;
+    }
+  }
+
+  touches_boundary (x, y) {
+    let left = x - this.ship_width / 2;
+    let right = x + this.ship_width / 2;
+    let top = y - this.ship_height / 2;
+    let bottom = y + this.ship_height / 2;
+   
+    if(left < 0 || right > this.canvas_width || top < 0 || bottom > this.canvas_height){
+      return true;
     }
     else{
-      rest_of_ship.arc(points[5].x, points[5].y, this.ship_height * 0.5 * (1 - wing_height_percentage),Math.PI, 2 * Math.PI);
+      return false;
+    }
+  }
+  
+  stroke_hitboxes(){
+    ctx.save();
+    for(let i = 0; i < this.hitboxes.length; i += 1){
+      let current_hitbox = this.hitboxes[i];
+      let hitbox_path = new Path2D();
+      hitbox_path.moveTo(current_hitbox.left, current_hitbox.bottom);
+      hitbox_path.lineTo(current_hitbox.left, current_hitbox.top);
+      hitbox_path.lineTo(current_hitbox.right, current_hitbox.top);
+      hitbox_path.lineTo(current_hitbox.right, current_hitbox.bottom);
+      hitbox_path.closePath();
+      ctx.stroke(hitbox_path);
+      
+    }
+    ctx.restore();
+  }
+
+  draw() {
+    ctx.save();
+    ctx.fillStyle = this.fill_color;
+    
+    let top_part = new Path2D();
+    top_part.moveTo(this.points[0].x, this.points[0].y);
+    top_part.lineTo(this.points[1].x, this.points[1].y);
+    top_part.lineTo(this.points[2].x, this.points[2].y);
+    top_part.closePath();
+    ctx.fill(top_part);
+    let rest_of_ship = new Path2D();
+    rest_of_ship.moveTo(
+      this.points[0].x,
+      this.points[0].y
+    );
+    rest_of_ship.lineTo(
+      this.points[3].x,
+      this.points[3].y
+    );
+    rest_of_ship.lineTo(
+      this.points[4].x,
+      this.points[4].y
+    );
+    
+    if(this.facing_top === true){
+      rest_of_ship.arc(this.points[5].x, this.points[5].y, this.radius, 0, Math.PI);
+    }
+    else{
+      rest_of_ship.arc(this.points[5].x, this.points[5].y, this.radius, Math.PI, 2 * Math.PI);
     }
     
-    rest_of_ship.lineTo(points[6].x, points[6].y);
-    rest_of_ship.lineTo(points[2].x, points[2].y);
-    this.ctx.fill(rest_of_ship);
-    this.ctx.restore();
+    rest_of_ship.lineTo(this.points[6].x, this.points[6].y);
+    rest_of_ship.lineTo(this.points[2].x, this.points[2].y);
+    ctx.fill(rest_of_ship);
+    this.stroke_hitboxes();
+    ctx.restore();
   }
-  on_frame = (input_array) => {
+
+  on_frame (input_array){
     
     this.draw();
   }
@@ -224,7 +402,7 @@ class Ship {
 
 class Asteroid{
   
-  constructor(ctx, center_x, center_y, canvas_width, canvas_height){
+  constructor(center_x, center_y, canvas_width, canvas_height){
     
     this.canvas_width = canvas_width;
     this.canvas_height = canvas_height;
@@ -233,14 +411,14 @@ class Asteroid{
     this.min_radius = this.max_radius - 8;
     this.center_x = center_x;
     this.center_y = center_y;
-    this.ctx = ctx;
+    
     this.fill_color = "hsl(0, 2%, 28%)";
     this.points = [];
     this.generate_points();
     
   }
 
-  is_out_of_bounds = () => {
+  is_out_of_bounds () {
     if(this.points[0].y > this.canvas_height){
       return true;
     }
@@ -249,7 +427,7 @@ class Asteroid{
     }
   }
 
-  generate_points = () => {
+  generate_points (){
     let point = {
      x: this.center_x,
      y: get_random_int(this.center_y - this.min_radius, this.center_y - this.max_radius)
@@ -273,118 +451,25 @@ class Asteroid{
 
   }
 
-  adjust_points = (adjust_by) => {
+  adjust_points (adjust_by){
     for(let i = 0; i < this.points.length; i += 1){
       this.points[i].y += adjust_by;
     }
   }
 
-  move = () => {
+  move (){
     this.center_y += this.speed;
     this.adjust_points(this.speed);
   }
 
-  on_frame = () => { 
+  on_frame(){ 
     this.move();
     this.draw();
 
   }
 
-  /*
-  generate_points = () => {
-    for(let i = 0; i < this.number_on_left; i += 1){
-      let proper_point = false;
-      while(proper_point === false){
-        console.log("generate_points_while_loop");
-        let point_x = get_random_int(this.center_x - this.max_radius, this.center_x - this.min_radius);
-        let point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
-        while(Math.abs(this.center_y - point_y) < this.min_radius){
-          point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
-        }
-        let cont_loop = false;
-        let point = {
-          x: point_x,
-          y: point_y
-        }
-        for(let j = 0; j < this.points.length; j += 1){
-          let scoped_point = this.points[j];
-          let distance_to_point = calculate_distance_between_points(scoped_point, point );
-          if(distance_to_point < this.radius_between_points){
-            cont_loop = true;
-            break;
-          }
-        }
-        if(cont_loop === true){
-          continue;
-        }
-        
-        this.points.push(point);
-        
-        proper_point = true;
-      }
-      
-      
-    }
-    for(let i = 0; i < this.number_on_right; i += 1){
-      let proper_point = false;
-      while(proper_point === false){
-        let point_x = get_random_int(this.center_x + this.min_radius, this.center_x + this.max_radius);
-        let point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
-        console.log("generate_points_while_loop");
-        while(Math.abs(this.center_y - point_y) < this.min_radius){
-          point_y = get_random_int(this.center_y - this.max_radius, this.center_y + this.max_radius);
-        }
-        let cont_loop = false;
-        for(let j = 0; j < this.points.length; j += 1){
-          let scoped_point = this.points[j];
-          let distance_to_point = Math.sqrt((Math.pow((point_x - scoped_point.x), 2) + Math.pow((point_y - scoped_point.y), 2)));
-          if(distance_to_point < this.radius_between_points){
-            cont_loop = true;
-            break;
-          }
-        }
-        if(cont_loop === true){
-          continue;
-        }
-        let point = {
-          x: point_x,
-          y: point_y
-        }
-        this.points.push(point);
-        
-        proper_point = true;
-      }
-      
-      
-    }
-    console.log(this.points);
-  }
-  generate_draw_order = () => {
-    let draw_order = [0];
-    
-    while(draw_order.length != this.number_of_points){
-      let current_point = this.points[draw_order[draw_order.length - 1]];
-      let distances = [];
-      let points = [];
-      for(let i = 0; i < this.points.length; i += 1){
-        if(draw_order.includes(i) === false){
-          points.push(i);
-        }
-      }
-      for(let i = 0; i < points.length; i += 1){
-        let distance_to = calculate_distance_between_points(current_point, this.points[points[i]]);
-        distances.push(distance_to);
-      }
-      let min_distance_index = find_min_index(distances);
-      
-      draw_order.push(points[min_distance_index]);
-    }
-    this.draw_order = draw_order;
-    console.log(this.draw_order);
-  }
-  */
-
-  draw = () => {
+  
+  draw () {
     let asteroid_path = new Path2D();
 
     /*
@@ -403,69 +488,71 @@ class Asteroid{
       asteroid_path.lineTo(point.x, point.y);
     }
     asteroid_path.closePath();
-    this.ctx.save();
-    this.ctx.fillStyle = this.fill_color;
-    this.ctx.fill(asteroid_path);
-    this.ctx.restore();
+    ctx.save();
+    ctx.fillStyle = this.fill_color;
+    ctx.fill(asteroid_path);
+    ctx.restore();
   }
 
 }
 
 
 class Player_ship extends Ship{
-  constructor(ctx, canvas_width, canvas_height, fill_color, facing_top){
-    super(ctx, canvas_width, canvas_height, fill_color, facing_top);
+  constructor(canvas_width, canvas_height, fill_color, facing_top){
+    super(canvas_width, canvas_height, fill_color, facing_top);
     this.center_x = this.canvas_width / 2;
     this.center_y = this.canvas_height - this.ship_height - 10;
+    this.generate_points();
+    this.generate_hitboxes();
   }
-  process_inputs = (input_array) => {
+  process_inputs (input_array) {
     
     if(input_array[0] === 1){
       let touches_boundary = this.touches_boundary(this.center_x, this.center_y - this.speed);
       
       if(touches_boundary === false){
-        this.center_y -= this.speed;
+        this.move_up();
       }
       
     }
     if(input_array[1] === 1){
       let touches_boundary = this.touches_boundary(this.center_x + this.speed, this.center_y);
       if(touches_boundary === false){
-        this.center_x += this.speed;
+        this.move_right();
       }
     }
     if(input_array[2] === 1){
       let touches_boundary = this.touches_boundary(this.center_x, this.center_y + this.speed);
+      
       if(touches_boundary === false){
-        this.center_y += this.speed;
+        this.move_down();
       }
     }
     if(input_array[3] === 1){
       let touches_boundary = this.touches_boundary(this.center_x - this.speed, this.center_y);
       if(touches_boundary === false){
-        this.center_x -= this.speed;
+        this.move_left();
       }
     }
   }
-  on_frame = (input_array) => {
+  on_frame (input_array) {
     this.process_inputs(input_array);
+    
     this.draw();
   }
 }
 
 class Game_field {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+  constructor() {
     this.frame_interval;
     let player_ship_color = "hsl(184, 100%, 50%)";
-    this.canvas_width = this.canvas.width;
-    this.canvas_height = this.canvas.height;
-    this.max_asteroids_on_field = 2;
+    this.canvas_width = canvas.width;
+    this.canvas_height = canvas.height;
+    this.max_asteroids_on_field = 1;
     this.min_x_distance_between_asteroids = ship_width + 25;
     this.asteroid_list = [];
     this.player_object = new Player_ship(
-      this.ctx,
+      
       this.canvas_width,
       this.canvas_height,
       player_ship_color,
@@ -476,12 +563,13 @@ class Game_field {
     this.input_array = [0, 0, 0, 0, 0];
     //this.bind_mouse_move_on_canvas();
     this.bind_keys();
+    this.on_frame = this.on_frame.bind(this);
     this.start_frame_interval();
   }
 
-  dispose_asteroids = () => {
+  dispose_asteroids (){
     
-    console.log(this.asteroid_list);
+    
     while(true){
       let found = false;
       for(let i = 0; i < this.asteroid_list.length; i += 1){
@@ -501,13 +589,13 @@ class Game_field {
     
   }
 
-  other_asteroids_close = (x) => {
+  other_asteroids_close  (x) {
     
     for(let i = 0; i < this.asteroid_list.length; i += 1){
       let asteroid_object = this.asteroid_list[i]
       let left_boundary = asteroid_object.points[3].x - this.min_x_distance_between_asteroids;
       let right_boundary = asteroid_object.points[1].x + this.min_x_distance_between_asteroids;
-      console.log(asteroid_object, left_boundary, right_boundary);
+      
       if(x >= left_boundary && x <= right_boundary){
         return true;
       }
@@ -516,7 +604,7 @@ class Game_field {
     return false;
   }
 
-  generate_asteroids = () => {
+  generate_asteroids () {
     let x_distance_increment = 10;
    
       for(let i = this.asteroid_list.length; i < this.max_asteroids_on_field; i += 1){
@@ -532,19 +620,19 @@ class Game_field {
           
         }
         let y = -max_asteroid_length;
-        let new_asteroid = new Asteroid(this.ctx, rand_x, y, this.canvas_width, this.canvas_height);
+        let new_asteroid = new Asteroid(rand_x, y, this.canvas_width, this.canvas_height);
         this.asteroid_list.push(new_asteroid);
       }
       
     
   }
 
-  stop_frames = () => {
+  stop_frames () {
     clearInterval(this.frame_interval);
   }
 
-  on_frame = () => {
-    this.ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
+  on_frame () {
+    ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
     this.player_object.on_frame(this.input_array);
     this.asteroid_list.forEach(asteroid => {
       asteroid.on_frame();
@@ -552,12 +640,12 @@ class Game_field {
     this.dispose_asteroids();
   }
 
-  start_frame_interval = () => {
+  start_frame_interval () {
     let ms = round_to(1000 / frame_rate, 1);
     this.frame_interval = setInterval(this.on_frame, ms);
   };
 
-  bind_keys = () => {
+  bind_keys () {
     window.onkeydown = (ev) => {
       let key = ev.key;
       
@@ -600,19 +688,12 @@ class Game_field {
       }
     }
   }
-  /*
-  bind_mouse_move_on_canvas = () => {
-    this.canvas.onmousemove = (ev) => {
-      let position = getMousePos(ev, this.canvas);
-      this.player_object.set_target(position.x, position.y);
-    };
-  };
-  */
+  
 }
 
 function main() {
   init_canvas();
-  let canvas = document.querySelector("#canvas");
+
   let game_field = new Game_field(canvas);
 }
 main();
