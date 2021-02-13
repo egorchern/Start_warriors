@@ -80,12 +80,53 @@ class Ship {
     this.top_part_hitboxes_number = 3;
     this.hitboxes_number_per_wing = 7;
     this.speed = 6.5;
-    this.max_speed = 10;
-    this.acceleration = 0.1;
+    this.bullets_per_valley = 1;
+    this.fire_rate = 3;
+    this.fire_counter = 0;
+    this.bullet_speed = 9;
     this.fill_color = fill_color;
     this.hitboxes = [];
     this.points = [];
+    this.bullet_spawn_locations = [];
+    this.bullet_list = [];
+  }
 
+  fire(){
+    let direction;
+    if(this.facing_top === true){
+      direction = "up";
+    }
+    else{
+      direction = "down";
+    }
+    for(let i = 0; i < this.bullet_spawn_locations.length; i += 1){
+      let currnet_bullet_spawn_location = this.bullet_spawn_locations[i];
+      let bullet = new Bullet(currnet_bullet_spawn_location.x, currnet_bullet_spawn_location.y, "red", 3, 7, this.bullet_speed, direction);
+      this.bullet_list.push(bullet);
+    }
+  }
+
+  should_fire(frame_number){
+    if(frame_number === frame_rate){
+      this.fire_counter = 0;
+    }
+    if(this.fire_counter != this.fire_rate){
+      let frame_as_second = round_to(frame_number / frame_rate, 2);
+      let fire_scale = round_to(1 / this.fire_rate , 2);
+      let current_slice = fire_scale * this.fire_counter;
+      if(frame_as_second >= current_slice){
+        this.fire_counter += 1;
+        
+        return true;
+      }
+      else{
+        return false;
+      }
+    }
+    else{
+      return false;
+    }
+    
   }
 
   generate_points() {
@@ -153,6 +194,40 @@ class Ship {
           y: this.center_y - this.ship_height * 0.5 * this.wing_height_percentage
         }
       ];
+    }
+  }
+
+  generate_bullet_spawn_location(){
+    if(this.facing_top === true){
+      let y_coord = this.points[1].y - 5;
+      let x_reference = this.points[1].x;
+      let x_dist_increment = 10;
+      let local_bullets_per_valley = this.bullets_per_valley;
+      if(local_bullets_per_valley % 2 === 1){
+        console.log(local_bullets_per_valley);
+        this.bullet_spawn_locations.push({
+          x: x_reference,
+          y: y_coord
+        });
+        local_bullets_per_valley -= 1;
+      }
+      let counter = 1;
+      for(let i = 0; i < local_bullets_per_valley; i += 1){
+        let amount;
+        if(i % 2 === 0){
+          amount = -(counter * x_dist_increment);
+        }
+        else{
+          amount = (counter * x_dist_increment);
+          counter += 1;
+        }
+        this.bullet_spawn_locations.push({
+          x: x_reference + amount,
+          y: y_coord
+        });
+      }
+      console.log(this.bullet_spawn_locations);
+
     }
   }
 
@@ -323,26 +398,53 @@ class Ship {
 
   move_left() {
     this.center_x -= this.speed;
-    this.adjust_points("left");
-    this.adjust_hitboxes("left");
+    this.adjust_everything("left");
   }
 
   move_up() {
     this.center_y -= this.speed;
-    this.adjust_points("up");
-    this.adjust_hitboxes("up");
+    this.adjust_everything("up");
   }
 
   move_right() {
     this.center_x += this.speed;
-    this.adjust_points("right");
-    this.adjust_hitboxes("right");
+    this.adjust_everything("right");
   }
 
   move_down() {
     this.center_y += this.speed;
-    this.adjust_points("down");
-    this.adjust_hitboxes("down");
+    this.adjust_everything("down");
+  }
+
+  adjust_bullet_spawn_locations(direction){
+    let coordinate, amount;
+    switch (direction) {
+      case ("up"):
+        coordinate = "y";
+        amount = -this.speed;
+        break;
+      case ("right"):
+        coordinate = "x";
+        amount = this.speed;
+        break;
+      case ("down"):
+        coordinate = "y";
+        amount = this.speed;
+        break;
+      case ("left"):
+        coordinate = "x";
+        amount = -this.speed;
+        break;
+    }
+    for(let i = 0; i < this.bullet_spawn_locations.length; i += 1){
+      this.bullet_spawn_locations[i][coordinate] += amount;
+    }
+  }
+
+  adjust_everything(direction){
+    this.adjust_points(direction);
+    this.adjust_hitboxes(direction);
+    this.adjust_bullet_spawn_locations(direction);
   }
 
   adjust_points(direction) {
@@ -472,12 +574,18 @@ class Ship {
     rest_of_ship.lineTo(this.points[6].x, this.points[6].y);
     rest_of_ship.lineTo(this.points[2].x, this.points[2].y);
     ctx.fill(rest_of_ship);
-    this.stroke_hitboxes();
+    //this.stroke_hitboxes();
     ctx.restore();
   }
 
-  on_frame(input_array) {
-
+  on_frame(frame_number) {
+    let should_fire = this.should_fire(frame_number);
+    if(should_fire === true){
+      this.fire();
+    }
+    this.bullet_list.forEach(bullet => {
+      bullet.on_frame();
+    })
     this.draw();
   }
 }
@@ -692,6 +800,44 @@ class Asteroid {
 
 }
 
+class Bullet{
+  constructor(center_x, center_y, fill_color, x_size, y_size, bullet_speed, direction){
+    this.center_x = center_x;
+    this.center_y = center_y;
+    this.fill_color = fill_color;
+    this.x_size = x_size;
+    this.y_size = y_size;
+    this.speed = bullet_speed;
+    this.direction = direction;
+  }
+
+  move_up(){
+    this.center_y -= this.speed;
+  }
+
+  move_down(){
+    this.center_y += this.speed;
+  }
+
+  on_frame(){
+    if(this.direction === "up"){
+      this.move_up();
+    }
+    else if(this.direction === "down"){
+      this.move_down();
+    }
+    this.draw();
+  }
+
+  draw(){
+    let bullet_path = new Path2D();
+    bullet_path.ellipse(this.center_x, this.center_y, this.x_size, this.y_size, 0, 0, Math.PI * 2);
+    ctx.save();
+    ctx.fillStyle = this.fill_color;
+    ctx.fill(bullet_path);
+    
+  }
+}
 
 class Player_ship extends Ship {
   constructor(canvas_width, canvas_height, fill_color, facing_top) {
@@ -700,6 +846,7 @@ class Player_ship extends Ship {
     this.center_y = this.canvas_height - this.ship_height - 10;
     this.generate_points();
     this.generate_hitboxes();
+    this.generate_bullet_spawn_location();
   }
   process_inputs(input_array) {
 
@@ -731,9 +878,17 @@ class Player_ship extends Ship {
       }
     }
   }
-  on_frame(input_array) {
+  on_frame(input_array, frame_number) {
+    
     this.process_inputs(input_array);
-
+    let should_fire = this.should_fire(frame_number);
+    if(should_fire === true){
+      this.fire();
+    }
+    this.bullet_list.forEach(bullet => {
+      bullet.on_frame();
+    })
+    
     this.draw();
   }
 }
@@ -745,18 +900,21 @@ class Game_field {
     this.canvas_width = canvas.width;
     this.canvas_height = canvas.height;
     this.max_asteroids_on_field = 1;
-    this.max_asteroid_on_screen = 7;
+    this.max_asteroid_on_screen = 6;
     this.increase_asteroid_count_seconds = 10;
+    this.seconds_elapsed = 0;
+    this.increase_asteroids_counter = 0;
     this.min_x_distance_between_asteroids = ship_width + 25;
     this.asteroid_list = [];
-    this.frame_count = 0;
+    this.frame_number = 0;
     this.player_object = new Player_ship(
 
       this.canvas_width,
       this.canvas_height,
       player_ship_color,
-      false
+      true
     );
+    
     this.generate_asteroids();
     // in order: up, right, down, left, shoot
     this.input_array = [0, 0, 0, 0, 0];
@@ -767,7 +925,7 @@ class Game_field {
   }
 
   increase_asteroid_count() {
-
+    this.increase_asteroids_counter = 0;
     if (this.max_asteroids_on_field < this.max_asteroid_on_screen) {
       this.max_asteroids_on_field += 1;
     }
@@ -874,14 +1032,26 @@ class Game_field {
     clearInterval(this.frame_interval);
   }
 
+  increment_time_variables(){
+    this.seconds_elapsed += 1;
+    this.increase_asteroids_counter += 1;
+  }
+
   on_frame() {
-    this.frame_count += 1;
-    if (this.frame_count / frame_rate === this.increase_asteroid_count_seconds) {
-      this.increase_asteroid_count();
-      this.frame_count = 0;
+    this.frame_number += 1;
+    if(this.frame_number > frame_rate){
+      this.increment_time_variables();
+      this.frame_number = 0;
     }
+    
+    if (this.increase_asteroids_counter === this.increase_asteroid_count_seconds) {
+      this.increase_asteroid_count();
+      
+    }
+    
     ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
-    this.player_object.on_frame(this.input_array);
+    
+    this.player_object.on_frame(this.input_array, this.frame_number);
     this.asteroid_list.forEach(asteroid => {
       asteroid.on_frame();
     });
@@ -891,6 +1061,7 @@ class Game_field {
     if (player_ship_collides_with_asteroids === true) {
       this.stop_frames();
     }
+    
   }
 
   start_frame_interval() {
