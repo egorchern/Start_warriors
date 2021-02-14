@@ -4,6 +4,7 @@ let ship_width = 55;
 let max_asteroid_length = 50;
 let frame_rate = 60;
 let canvas, ctx;
+let canvas_width, canvas_height;
 //TODO remake into keyboard control
 function round_to(n, digits) {
   if (digits === undefined) {
@@ -29,6 +30,8 @@ function init_canvas() {
   root.innerHTML = canv_html;
   canvas = document.querySelector("#canvas");
   ctx = canvas.getContext("2d");
+  canvas_width = canvas.width;
+  canv_height = canvas.height;
 }
 
 function find_min_index(array) {
@@ -81,7 +84,7 @@ class Ship {
     this.hitboxes_number_per_wing = 7;
     this.speed = 6.5;
     this.bullets_per_valley = 1;
-    this.fire_rate = 3;
+    this.fire_rate = 2;
     this.fire_counter = 0;
     this.bullet_speed = 9;
     this.fill_color = fill_color;
@@ -115,6 +118,7 @@ class Ship {
       let fire_scale = round_to(1 / this.fire_rate , 2);
       let current_slice = fire_scale * this.fire_counter;
       if(frame_as_second >= current_slice){
+        
         this.fire_counter += 1;
         
         return true;
@@ -127,6 +131,30 @@ class Ship {
       return false;
     }
     
+  }
+
+  dispose_bullets(){
+    let stop_loop = false;
+    while(stop_loop === false){
+      let some_found = false;
+      console.log(this.bullet_list);
+      for(let i = 0; i < this.bullet_list.length; i += 1){
+        let curent_bullet = this.bullet_list[i];
+        
+        let out_of_bounds = curent_bullet.is_out_of_bounds();
+        
+        if(out_of_bounds === true){
+        
+          some_found = true;
+          this.bullet_list.splice(i, 1);
+          break;
+        }
+        
+        
+      }
+      stop_loop = !some_found;
+
+    }
   }
 
   generate_points() {
@@ -583,6 +611,7 @@ class Ship {
     if(should_fire === true){
       this.fire();
     }
+    this.dispose_bullets();
     this.bullet_list.forEach(bullet => {
       bullet.on_frame();
     })
@@ -809,14 +838,73 @@ class Bullet{
     this.y_size = y_size;
     this.speed = bullet_speed;
     this.direction = direction;
+    this.hitboxes = [];
   }
+
+  generate_hitboxes(){
+    let hitbox = {
+      left: this.center_x - this.x_size / 2,
+      right: this.center_x + this.x_size / 2,
+      top: this.center_y - this.y_size / 2,
+      bottom: this.center_y += this.y_size / 2
+    }
+    this.hitboxes.push(hitbox);
+  }
+
+  adjust_hitboxes(direction) {
+    let coordinate, amount;
+    switch (direction) {
+      case ("up"):
+        coordinate = "y";
+        amount = -this.speed;
+        break;
+      case ("right"):
+        coordinate = "x";
+        amount = this.speed;
+        break;
+      case ("down"):
+        coordinate = "y";
+        amount = this.speed;
+        break;
+      case ("left"):
+        coordinate = "x";
+        amount = -this.speed;
+        break;
+    }
+
+    for (let i = 0; i < this.hitboxes.length; i += 1) {
+      let current_hitbox = this.hitboxes[i];
+      if (coordinate === "x") {
+        current_hitbox.left += amount;
+        current_hitbox.right += amount;
+
+      }
+      else {
+        current_hitbox.bottom += amount;
+        current_hitbox.top += amount;
+      }
+      this.hitboxes[i] = current_hitbox;
+    }
+  }
+
 
   move_up(){
     this.center_y -= this.speed;
+    this.adjust_hitboxes("up");
+  }
+
+  is_out_of_bounds(){
+    if(this.center_y - this.y_size / 2 < 0 || this.center_y + this.y_size / 2 > canvas_height){
+      return true;
+    }
+    else{
+      return false;
+    }
   }
 
   move_down(){
     this.center_y += this.speed;
+    this.adjust_hitboxes("down");
   }
 
   on_frame(){
@@ -885,10 +973,11 @@ class Player_ship extends Ship {
     if(should_fire === true){
       this.fire();
     }
+    this.dispose_bullets();
     this.bullet_list.forEach(bullet => {
       bullet.on_frame();
     })
-    
+    console.log(this.bullet_list);
     this.draw();
   }
 }
