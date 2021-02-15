@@ -66,6 +66,22 @@ function getMousePos(evt, canv) {
   };
 }
 
+function draw_menu(attack_damage, attack_rate, attacks_per_valley, hitpoints, score){
+  let vertical_space_between = 20;
+  ctx.save();
+  ctx.font = "14px sans-serif";
+  let y_dist = 20;
+  ctx.fillText(`Attack damage: ${attack_damage}`, canvas_width - 110, y_dist, 105);
+  y_dist += vertical_space_between;
+  ctx.fillText(`Attack rate: ${attack_rate}`, canvas_width - 110, y_dist, 105);
+  y_dist += vertical_space_between;
+  ctx.fillText(`Bullets/attack: ${attacks_per_valley}`, canvas_width - 110, y_dist, 105);
+  y_dist += vertical_space_between;
+  ctx.fillText(`Hitpoints: ${hitpoints}`, canvas_width - 110, y_dist, 105);
+  y_dist += vertical_space_between;
+  ctx.fillText(`Score: ${score}`, canvas_width - 110, y_dist, 105);
+}
+
 class Ship {
   constructor(canvas_width, canvas_height, fill_color, facing_top) {
 
@@ -90,6 +106,7 @@ class Ship {
     this.bullet_speed = 9;
     this.fill_color = fill_color;
     this.hitboxes = [];
+    this.hitpoints = 2;
     this.points = [];
     this.bullet_spawn_locations = [];
     this.bullet_list = [];
@@ -622,7 +639,7 @@ class Ship {
 
 class Asteroid {
 
-  constructor(center_x, center_y, canvas_width, canvas_height) {
+  constructor(center_x, center_y, canvas_width, canvas_height, hitpoints) {
 
     this.canvas_width = canvas_width;
     this.canvas_height = canvas_height;
@@ -631,7 +648,7 @@ class Asteroid {
     this.min_radius = this.max_radius - 8;
     this.center_x = center_x;
     this.center_y = center_y;
-    this.hitpoints = 2;
+    this.hitpoints = hitpoints;
     this.fill_color = "hsl(0, 2%, 28%)";
     this.points = [];
     this.hitboxes = [];
@@ -1022,6 +1039,12 @@ class Game_field {
     this.min_x_distance_between_asteroids = ship_width + 25;
     this.asteroid_list = [];
     this.frame_number = 0;
+    this.asteroid_hitpoints = 1;
+    this.asteroid_max_hitpoints = 6;
+    this.increase_asteroid_hitpoints_counter = 0;
+    this.increase_asteroid_hitpoints_after = 30;
+    this.score = 0;
+    this.points_per_asteroid = 10;
     this.player_object = new Player_ship(
 
       this.canvas_width,
@@ -1045,6 +1068,13 @@ class Game_field {
       this.max_asteroids_on_field += 1;
     }
 
+  }
+
+  increase_asteroid_hitpoints(){
+    this.increase_asteroid_hitpoints_counter = 0;
+    if(this.asteroid_hitpoints < this.asteroid_max_hitpoints){
+      this.asteroid_hitpoints += 1;
+    }
   }
 
   dispose_asteroids() {
@@ -1110,7 +1140,7 @@ class Game_field {
 
       }
       let y = -max_asteroid_length;
-      let new_asteroid = new Asteroid(rand_x, y, this.canvas_width, this.canvas_height);
+      let new_asteroid = new Asteroid(rand_x, y, this.canvas_width, this.canvas_height, this.asteroid_hitpoints);
       this.asteroid_list.push(new_asteroid);
     }
 
@@ -1150,6 +1180,8 @@ class Game_field {
   increment_time_variables(){
     this.seconds_elapsed += 1;
     this.increase_asteroids_counter += 1;
+    this.increase_asteroid_hitpoints_counter += 1;
+    console.log(this.increase_asteroid_hitpoints_counter);
   }
 
   handle_player_ship_bullets_with_asteroids(){
@@ -1171,7 +1203,7 @@ class Game_field {
             local_player_ship_bullet_list.splice(i, 1);
             
             if(current_asteroid.hitpoints <= 0){
-              
+              this.score += this.points_per_asteroid * this.asteroid_hitpoints;
               some_found = true;
               this.asteroid_list.splice(j, 1);
               break;
@@ -1199,6 +1231,10 @@ class Game_field {
       this.increase_asteroid_count();
       
     }
+
+    if(this.increase_asteroid_hitpoints_counter === this.increase_asteroid_hitpoints_after){
+      this.increase_asteroid_hitpoints();
+    }
     
     ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
     
@@ -1212,7 +1248,7 @@ class Game_field {
     }
     this.handle_player_ship_bullets_with_asteroids();
     this.dispose_asteroids();
-    
+    draw_menu(this.player_object.bullet_damage, this.player_object.fire_rate, this.player_object.bullets_per_valley, this.player_object.hitpoints, this.score);
     
     
   }
