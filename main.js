@@ -85,6 +85,7 @@ class Ship {
     this.speed = 6.5;
     this.bullets_per_valley = 1;
     this.fire_rate = 2;
+    this.bullet_damage = 1;
     this.fire_counter = 0;
     this.bullet_speed = 9;
     this.fill_color = fill_color;
@@ -104,7 +105,7 @@ class Ship {
     }
     for(let i = 0; i < this.bullet_spawn_locations.length; i += 1){
       let currnet_bullet_spawn_location = this.bullet_spawn_locations[i];
-      let bullet = new Bullet(currnet_bullet_spawn_location.x, currnet_bullet_spawn_location.y, "red", 3, 7, this.bullet_speed, direction);
+      let bullet = new Bullet(currnet_bullet_spawn_location.x, currnet_bullet_spawn_location.y, "red", 3, 7, this.bullet_speed, direction, this.bullet_damage);
       this.bullet_list.push(bullet);
     }
   }
@@ -137,7 +138,7 @@ class Ship {
     let stop_loop = false;
     while(stop_loop === false){
       let some_found = false;
-      console.log(this.bullet_list);
+      
       for(let i = 0; i < this.bullet_list.length; i += 1){
         let curent_bullet = this.bullet_list[i];
         
@@ -232,7 +233,7 @@ class Ship {
       let x_dist_increment = 10;
       let local_bullets_per_valley = this.bullets_per_valley;
       if(local_bullets_per_valley % 2 === 1){
-        console.log(local_bullets_per_valley);
+       
         this.bullet_spawn_locations.push({
           x: x_reference,
           y: y_coord
@@ -254,7 +255,7 @@ class Ship {
           y: y_coord
         });
       }
-      console.log(this.bullet_spawn_locations);
+      
 
     }
   }
@@ -630,11 +631,11 @@ class Asteroid {
     this.min_radius = this.max_radius - 8;
     this.center_x = center_x;
     this.center_y = center_y;
-
+    this.hitpoints = 2;
     this.fill_color = "hsl(0, 2%, 28%)";
     this.points = [];
     this.hitboxes = [];
-    this.number_of_hitboxes_per_half = 8;
+    this.number_of_hitboxes_per_half = 6;
     this.generate_points();
     this.generate_hitboxes();
   }
@@ -830,24 +831,27 @@ class Asteroid {
 }
 
 class Bullet{
-  constructor(center_x, center_y, fill_color, x_size, y_size, bullet_speed, direction){
+  constructor(center_x, center_y, fill_color, x_radius, y_radius, bullet_speed, direction, damage){
     this.center_x = center_x;
     this.center_y = center_y;
     this.fill_color = fill_color;
-    this.x_size = x_size;
-    this.y_size = y_size;
+    this.x_radius = x_radius;
+    this.y_radius = y_radius;
     this.speed = bullet_speed;
     this.direction = direction;
     this.hitboxes = [];
+    this.damage = damage;
+    this.generate_hitboxes();
   }
 
   generate_hitboxes(){
     let hitbox = {
-      left: this.center_x - this.x_size / 2,
-      right: this.center_x + this.x_size / 2,
-      top: this.center_y - this.y_size / 2,
-      bottom: this.center_y += this.y_size / 2
+      left: this.center_x - this.x_radius,
+      right: this.center_x + this.x_radius,
+      top: this.center_y - this.y_radius,
+      bottom: this.center_y + this.y_radius
     }
+   
     this.hitboxes.push(hitbox);
   }
 
@@ -894,7 +898,7 @@ class Bullet{
   }
 
   is_out_of_bounds(){
-    if(this.center_y - this.y_size / 2 < 0 || this.center_y + this.y_size / 2 > canvas_height){
+    if(this.center_y - this.y_radius < 0 || this.center_y + this.y_radius > canvas_height){
       return true;
     }
     else{
@@ -917,13 +921,35 @@ class Bullet{
     this.draw();
   }
 
+  stroke_hitboxes() {
+    ctx.save();
+    for (let i = 0; i < this.hitboxes.length; i += 1) {
+      let current_hitbox = this.hitboxes[i];
+      let hitbox_path = new Path2D();
+      hitbox_path.moveTo(current_hitbox.left, current_hitbox.bottom);
+      hitbox_path.lineTo(current_hitbox.left, current_hitbox.top);
+      hitbox_path.lineTo(current_hitbox.right, current_hitbox.top);
+      hitbox_path.lineTo(current_hitbox.right, current_hitbox.bottom);
+      hitbox_path.closePath();
+      
+      ctx.stroke(hitbox_path);
+     
+
+    }
+    ctx.restore();
+  }
+
   draw(){
     let bullet_path = new Path2D();
-    bullet_path.ellipse(this.center_x, this.center_y, this.x_size, this.y_size, 0, 0, Math.PI * 2);
+    bullet_path.ellipse(this.center_x, this.center_y, this.x_radius, this.y_radius, 0, 0, Math.PI * 2);
+    bullet_path.closePath();
     ctx.save();
     ctx.fillStyle = this.fill_color;
     ctx.fill(bullet_path);
     
+    //this.stroke_hitboxes();
+    ctx.restore();
+
   }
 }
 
@@ -977,7 +1003,7 @@ class Player_ship extends Ship {
     this.bullet_list.forEach(bullet => {
       bullet.on_frame();
     })
-    console.log(this.bullet_list);
+    
     this.draw();
   }
 }
@@ -1126,6 +1152,42 @@ class Game_field {
     this.increase_asteroids_counter += 1;
   }
 
+  handle_player_ship_bullets_with_asteroids(){
+    
+    let local_player_ship_bullet_list = this.player_object.bullet_list;
+    while(true){
+
+      let some_found = false;
+      for(let i = 0; i < local_player_ship_bullet_list.length; i += 1){
+        let bullet = local_player_ship_bullet_list[i];
+        for(let j = 0; j < this.asteroid_list.length; j += 1){
+          let current_asteroid = this.asteroid_list[j];
+          
+          let hitboxes_collide = this.hitboxes_collide(current_asteroid.hitboxes, bullet.hitboxes);
+          
+          if(hitboxes_collide === true){
+            
+            current_asteroid.hitpoints -= bullet.damage;
+            local_player_ship_bullet_list.splice(i, 1);
+            
+            if(current_asteroid.hitpoints <= 0){
+              
+              some_found = true;
+              this.asteroid_list.splice(j, 1);
+              break;
+            }
+          }
+        }
+        if(some_found === true){
+          break;
+        }
+      }
+      if(some_found === false){
+        break;
+      }
+    }
+  }
+
   on_frame() {
     this.frame_number += 1;
     if(this.frame_number > frame_rate){
@@ -1144,12 +1206,14 @@ class Game_field {
     this.asteroid_list.forEach(asteroid => {
       asteroid.on_frame();
     });
-    this.dispose_asteroids();
     let player_ship_collides_with_asteroids = this.player_ship_collides_with_asteroids();
-
     if (player_ship_collides_with_asteroids === true) {
       this.stop_frames();
     }
+    this.handle_player_ship_bullets_with_asteroids();
+    this.dispose_asteroids();
+    
+    
     
   }
 
