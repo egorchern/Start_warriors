@@ -1110,7 +1110,8 @@ class Game_field {
     this.asteroid_max_hitpoints = 6;
     this.increase_asteroid_hitpoints_counter = 0;
     this.increase_asteroid_hitpoints_after = 30;
-    
+    this.player_hp_regen_after = 30;
+    this.player_hp_regen_counter = 0;
     this.upgrade_after = 40;
     this.upgrade_counter = this.upgrade_after;
     this.score = 0;
@@ -1131,7 +1132,7 @@ class Game_field {
     this.start_frame_interval();
   }
 
-  draw_menu(attack_damage, attack_rate, attacks_per_valley, hitpoints, score) {
+  draw_menu(attack_damage, attack_rate, attacks_per_valley, hitpoints, score, regen_rate) {
     let vertical_space_between = 20;
     ctx.save();
     ctx.font = "14px sans-serif";
@@ -1158,6 +1159,8 @@ class Game_field {
     );
     y_dist += vertical_space_between;
     ctx.fillText(`Hitpoints: ${hitpoints}`, canvas_width - 110, y_dist, 105);
+    y_dist += vertical_space_between;
+    ctx.fillText(`Hp regen rate: ${regen_rate}`, canvas_width - 110, y_dist, 105);
     y_dist += vertical_space_between;
     ctx.fillText(`Score: ${score}`, canvas_width - 110, y_dist, 105);
     
@@ -1241,6 +1244,7 @@ class Game_field {
             this.player_object.max_hitpoints += 2;
             break;
           case 5:
+            this.player_hp_regen_after -= 4;
             break;
           case 6:
             this.player_object.speed += 1;
@@ -1266,9 +1270,15 @@ class Game_field {
     ) {
       this.increase_asteroid_hitpoints();
     }
-    console.log(this.upgrade_counter, this.upgrade_after);
+    
     if (this.upgrade_counter === this.upgrade_after) {
       this.handle_upgrade();
+    }
+
+    if(this.player_hp_regen_counter === this.player_hp_regen_after){
+      if(this.player_object.hitpoints < this.player_object.max_hitpoints){
+        this.player_object.hitpoints += 1;
+      }
     }
   }
 
@@ -1305,17 +1315,29 @@ class Game_field {
     this.generate_asteroids();
   }
 
-  player_ship_collides_with_asteroids() {
-    for (let i = 0; i < this.asteroid_list.length; i += 1) {
-      let collide_bool = this.hitboxes_collide(
-        this.player_object.hitboxes,
-        this.asteroid_list[i].hitboxes
-      );
-      if (collide_bool === true) {
-        return true;
+  handle_player_ship_collides_with_asteroids() {
+    while(true){
+
+      let some_found = false;
+      for (let i = 0; i < this.asteroid_list.length; i += 1) {
+        let collide_bool = this.hitboxes_collide(
+          this.player_object.hitboxes,
+          this.asteroid_list[i].hitboxes
+        );
+        if (collide_bool === true) {
+          some_found = true;
+          this.player_object.hitpoints -= 1;
+          this.asteroid_list.splice(i, 1);
+          if(this.player_object.hitpoints <= 0){
+            this.stop_frames();
+          }
+        }
+      }
+      if(some_found === false){
+        break;
       }
     }
-    return false;
+    
   }
 
   other_asteroids_close(x) {
@@ -1416,6 +1438,7 @@ class Game_field {
     this.increase_asteroids_counter += 1;
     this.increase_asteroid_hitpoints_counter += 1;
     this.upgrade_counter += 1;
+    this.player_hp_regen_counter += 1;
   }
 
   handle_player_ship_bullets_with_asteroids() {
@@ -1468,10 +1491,7 @@ class Game_field {
     this.asteroid_list.forEach((asteroid) => {
       asteroid.on_frame();
     });
-    let player_ship_collides_with_asteroids = this.player_ship_collides_with_asteroids();
-    if (player_ship_collides_with_asteroids === true) {
-      this.stop_frames();
-    }
+    this.handle_player_ship_collides_with_asteroids();
     this.handle_player_ship_bullets_with_asteroids();
     this.dispose_asteroids();
     this.draw_menu(
@@ -1479,7 +1499,8 @@ class Game_field {
       this.player_object.fire_rate,
       this.player_object.bullets_per_valley,
       this.player_object.hitpoints,
-      this.score
+      this.score,
+      this.player_hp_regen_after
     );
     this.check_timed_events();
   }
