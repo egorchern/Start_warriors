@@ -19,6 +19,6 @@ body, html{
 }
 #canvas{
     border: 1px solid black;
-    cursor: none;
+    
     /*border-radius: 8px;*/
 }

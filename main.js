@@ -1,7 +1,7 @@
 let root = document.querySelector("#root");
-let ship_height = 45;
-let ship_width = 55;
-let max_asteroid_length = 50;
+let ship_height = 40;
+let ship_width = 50;
+let max_asteroid_length = 45;
 let frame_rate = 60;
 let canvas, ctx;
 let canvas_width, canvas_height;
@@ -33,9 +33,9 @@ function drawString(ctx, text, posX, posY, textColor, rotation, font, fontSize) 
   ctx.restore();
 }
 
-function find_index(array, element){
-  for(let i = 0; i < array.length; i += 1){
-    if(array[i] === element){
+function find_index(array, element) {
+  for (let i = 0; i < array.length; i += 1) {
+    if (array[i] === element) {
       return i;
     }
   }
@@ -283,7 +283,7 @@ class Ship {
     if (this.facing_top === true) {
       let y_coord = this.points[1].y - 5;
       let x_reference = this.points[1].x;
-      let x_dist_increment = 10;
+      let x_dist_increment = 8;
       let local_bullets_per_valley = this.bullets_per_valley;
       if (local_bullets_per_valley % 2 === 1) {
         this.bullet_spawn_locations.push({
@@ -301,7 +301,7 @@ class Ship {
           amount = counter * x_dist_increment;
           counter += 1;
         }
-        
+
         this.bullet_spawn_locations.push({
           x: x_reference + amount,
           y: y_coord,
@@ -1122,7 +1122,7 @@ class Game_field {
       player_ship_color,
       true
     );
-
+    this.enemy_ships_list = [];
     this.generate_asteroids();
     // in order: up, right, down, left, shoot
     this.input_array = [0, 0, 0, 0, 0];
@@ -1130,6 +1130,55 @@ class Game_field {
     this.bind_keys();
     this.on_frame = this.on_frame.bind(this);
     this.start_frame_interval();
+  }
+
+  get_usable_range() {
+    let boundaries_list = [];
+    this.asteroid_list.forEach(asteroid => {
+      boundaries_list.push([asteroid.points[3].x, asteroid.points[1].x]);
+    })
+    this.enemy_ships_list.forEach(ship => {
+      let left_boundary = ship.center_x - ship.ship_width / 2;
+      let right_boundary = ship.center_x + ship.ship_width / 2;
+      boundaries_list.push([left_boundary, right_boundary]);
+    })
+    
+    for (let i = 0; i < boundaries_list.length; i += 1) {
+      for (let j = 0; j < boundaries_list.length - 1; j += 1) {
+        let left_1 = boundaries_list[j][0];
+        let left_2 = boundaries_list[j + 1][0];
+        if (left_1 > left_2) {
+          let temp = boundaries_list[j];
+          boundaries_list[j] = boundaries_list[j + 1];
+
+          boundaries_list[j + 1] = temp;
+          
+        }
+      }
+
+    }
+    let free_ranges = [];
+    let running_x = 0;
+    for (let i = 0; i < boundaries_list.length; i += 1) {
+      free_ranges.push([running_x, boundaries_list[i][0]]);
+      running_x = boundaries_list[i][1];
+    }
+    free_ranges.push([running_x, canvas_width]);
+    
+    return free_ranges;
+  }
+
+  apply_min_distance_on_ranges(min_distance, free_ranges) {
+    let new_ranges = [];
+    for (let i = 0; i < free_ranges.length; i += 1) {
+      let current_range = free_ranges[i];
+      let left = current_range[0];
+      let right = current_range[1];
+      if (right - left > min_distance) {
+        new_ranges.push(current_range);
+      }
+    }
+    return new_ranges;
   }
 
   draw_menu(attack_damage, attack_rate, attacks_per_valley, hitpoints, score, regen_rate) {
@@ -1163,7 +1212,7 @@ class Game_field {
     ctx.fillText(`Hp regen rate: ${regen_rate}`, canvas_width - 110, y_dist, 105);
     y_dist += vertical_space_between;
     ctx.fillText(`Score: ${score}`, canvas_width - 110, y_dist, 105);
-    
+
     ctx.restore();
   }
 
@@ -1270,13 +1319,13 @@ class Game_field {
     ) {
       this.increase_asteroid_hitpoints();
     }
-    
+
     if (this.upgrade_counter === this.upgrade_after) {
       this.handle_upgrade();
     }
 
-    if(this.player_hp_regen_counter === this.player_hp_regen_after){
-      if(this.player_object.hitpoints < this.player_object.max_hitpoints){
+    if (this.player_hp_regen_counter === this.player_hp_regen_after) {
+      if (this.player_object.hitpoints < this.player_object.max_hitpoints) {
         this.player_object.hitpoints += 1;
       }
     }
@@ -1316,7 +1365,7 @@ class Game_field {
   }
 
   handle_player_ship_collides_with_asteroids() {
-    while(true){
+    while (true) {
 
       let some_found = false;
       for (let i = 0; i < this.asteroid_list.length; i += 1) {
@@ -1328,16 +1377,16 @@ class Game_field {
           some_found = true;
           this.player_object.hitpoints -= 1;
           this.asteroid_list.splice(i, 1);
-          if(this.player_object.hitpoints <= 0){
+          if (this.player_object.hitpoints <= 0) {
             this.stop_frames();
           }
         }
       }
-      if(some_found === false){
+      if (some_found === false) {
         break;
       }
     }
-    
+
   }
 
   other_asteroids_close(x) {
@@ -1355,9 +1404,15 @@ class Game_field {
     return false;
   }
 
-  generate_asteroids() {
-    let x_distance_increment = 10;
+  generate_entities() {
 
+  }
+
+  generate_asteroids() {
+    //#region 
+    /*
+    let x_distance_increment = 10;
+    
     for (
       let i = this.asteroid_list.length;
       i < this.max_asteroids_on_field;
@@ -1384,6 +1439,28 @@ class Game_field {
         this.asteroid_hitpoints
       );
       this.asteroid_list.push(new_asteroid);
+    }
+    */
+    //#endregion
+    let min = max_asteroid_length + 1;
+    for (let i = this.asteroid_list.length; i < this.max_asteroids_on_field; i += 1) {
+      
+      let ranges = this.get_usable_range();
+      console.log(ranges);
+      ranges = this.apply_min_distance_on_ranges(min, ranges);
+      console.log(ranges);
+      if(ranges.length > 0){
+        let range_index = get_random_int(0, ranges.length - 1);
+        let range = ranges[range_index];
+        
+        let choosable = [range[0] + min / 2, range[1] - min / 2];
+        
+        let center_x = get_random_int(choosable[0], choosable[1]);
+       
+        let asteroid = new Asteroid(center_x, -max_asteroid_length, canvas_width, canvas_height, this.asteroid_hitpoints);
+        
+        this.asteroid_list.push(asteroid);
+      }
     }
   }
 
