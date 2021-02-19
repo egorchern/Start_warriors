@@ -18,17 +18,26 @@ function round_to(n, digits) {
   return Math.round(n) / multiplicator;
 }
 
-function drawString(ctx, text, posX, posY, textColor, rotation, font, fontSize) {
+function drawString(
+  ctx,
+  text,
+  posX,
+  posY,
+  textColor,
+  rotation,
+  font,
+  fontSize
+) {
   var lines = text.split("\n");
   if (!rotation) rotation = 0;
   if (!font) font = "'serif'";
   if (!fontSize) fontSize = 16;
-  if (!textColor) textColor = '#000000';
+  if (!textColor) textColor = "#000000";
   ctx.save();
   ctx.font = fontSize + "px " + font;
   ctx.fillStyle = textColor;
   ctx.translate(posX, posY);
-  ctx.rotate(rotation * Math.PI / 180);
+  ctx.rotate((rotation * Math.PI) / 180);
   for (i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], 0, i * fontSize);
   }
@@ -43,7 +52,6 @@ function find_index(array, element) {
   }
   return -1;
 }
-
 
 function init_canvas() {
   //let height_to_width_ratio = 1.618;
@@ -128,6 +136,7 @@ class Ship {
     this.bullet_x_radius = 3;
     this.bullet_y_radius = 7;
     this.bullet_list = [];
+    this.target_x = undefined;
   }
 
   fire() {
@@ -285,7 +294,7 @@ class Ship {
 
   generate_bullet_spawn_location() {
     this.bullet_spawn_locations = [];
-    
+
     let y_coord = this.points[1].y - 5;
     let x_reference = this.points[1].x;
     let x_dist_increment = 8;
@@ -312,8 +321,6 @@ class Ship {
         y: y_coord,
       });
     }
-    
-    
   }
 
   generate_hitboxes() {
@@ -676,9 +683,16 @@ class Ship {
   }
 
   on_frame(frame_number) {
-    if(this.center_y - this.ship_height < 0){
+    if (this.center_y - this.ship_height < 0) {
       this.move_down();
     }
+    if(Math.abs(this.center_x - this.target_x) >= this.speed && this.center_x < this.target_x){
+      this.move_right();
+    }
+    if(Math.abs(this.center_x - this.target_x) >= this.speed && this.center_x > this.target_x){
+      this.move_left();
+    }
+    
     let should_fire = this.should_fire(frame_number);
     if (should_fire === true) {
       this.fire();
@@ -687,9 +701,8 @@ class Ship {
     this.bullet_list.forEach((bullet) => {
       bullet.on_frame();
     });
-    
+
     this.draw();
-    
   }
 }
 
@@ -899,7 +912,7 @@ class Asteroid {
     ctx.save();
     ctx.fillStyle = this.fill_color;
     ctx.fill(asteroid_path);
-    this.stroke_hitboxes();
+    //this.stroke_hitboxes();
     ctx.restore();
   }
 }
@@ -1034,7 +1047,7 @@ class Bullet {
     ctx.fillStyle = this.fill_color;
     ctx.fill(bullet_path);
 
-    this.stroke_hitboxes();
+    //this.stroke_hitboxes();
     ctx.restore();
   }
 }
@@ -1103,8 +1116,16 @@ class Player_ship extends Ship {
   }
 }
 
-class Enemy_ship_small extends Ship{
-  constructor(center_x, center_y, canvas_width, canvas_height, fill_color, facing_top, hitpoints) {
+class Enemy_ship_small extends Ship {
+  constructor(
+    center_x,
+    center_y,
+    canvas_width,
+    canvas_height,
+    fill_color,
+    facing_top,
+    hitpoints
+  ) {
     super(canvas_width, canvas_height, fill_color, facing_top);
     this.center_x = center_x;
     this.center_y = center_y;
@@ -1129,15 +1150,15 @@ class Game_field {
     this.canvas_width = canvas.width;
     this.canvas_height = canvas.height;
     this.max_asteroids_on_field = 1;
-    this.max_asteroid_on_screen = 8;
-    this.increase_asteroid_count_seconds = 10;
+    this.max_asteroid_on_screen = 10;
+    this.increase_asteroid_count_seconds = 15;
     this.seconds_elapsed = 0;
     this.increase_asteroids_counter = 0;
-    this.min_x_distance_between_asteroids = ship_width + 25;
+
     this.asteroid_list = [];
     this.frame_number = 0;
     this.asteroid_hitpoints = 1;
-    this.asteroid_max_hitpoints = 6;
+    //this.asteroid_max_hitpoints = 6;
     this.increase_asteroid_hitpoints_counter = 0;
     this.increase_asteroid_hitpoints_after = 30;
     this.player_hp_regen_after = 30;
@@ -1145,11 +1166,14 @@ class Game_field {
     this.upgrade_after = 40;
     this.upgrade_counter = this.upgrade_after;
     this.score = 0;
+    this.score_per_small_ship = 30;
     this.points_per_asteroid = 10;
-    this.enemy_ships_on_field = 1;
+    this.enemy_ships_on_field = 0;
     this.enemy_ships_max = 3;
-    this.enemy_ships_increase_after = 10;
+    this.enemy_ships_increase_after = 30;
     this.enemy_ships_increase_counter = 0;
+    this.enemy_ship_spawn_cooldown = 3 * frame_rate;
+    this.enemy_ship_spawn_cooldown_counter = 0;
     this.player_object = new Player_ship(
       this.canvas_width,
       this.canvas_height,
@@ -1158,6 +1182,10 @@ class Game_field {
     );
     this.enemy_ship_color = "hsl(30, 100%, 60%)";
     this.enemy_ship_hitpoints = 2;
+    this.enemy_ship_hitpoints_increase_after = 20;
+    this.enemy_ship_hitpoints_increase_counter = 0;
+    this.enemy_ships_attempt_to_move_every = 3 * frame_rate;
+    this.enemy_ships_move_counters = [];
     this.enemy_ships_list = [];
     this.generate_entities();
     // in order: up, right, down, left, shoot
@@ -1166,30 +1194,65 @@ class Game_field {
     this.bind_keys();
     this.on_frame = this.on_frame.bind(this);
     this.start_frame_interval();
-    console.log(this.hitboxes_collide([{
-      left: 312,
-      right: 323,
-      top: 323,
-      bottom: 346
-    }], [{
-      left: 310,
-      right: 320,
-      top: 300,
-      bottom: 340
-    }]));
+  }
+
+  attempt_enemy_ships_move(){
+    let min_distance = small_ship_width + 10;
+    for(let i = 0; i < this.enemy_ships_list.length; i += 1){
+      let current_ship = this.enemy_ships_list[i];
+      if(this.enemy_ships_move_counters[i] >= this.enemy_ships_attempt_to_move_every){
+        let usable_ranges = this.get_usable_range();
+        let left_range, right_range;
+        let left = current_ship.center_x - current_ship.ship_width / 2;
+        let right = current_ship.center_x + current_ship.ship_width / 2;
+        for(let i = 0; i < usable_ranges.length; i += 1){
+          let current_range = usable_ranges[i];
+          if(current_range[1] === left){
+            left_range = current_range;
+          }
+          if(current_range[0] === right){
+            right_range = current_range;
+          }
+
+        }
+        
+        let left_dist = left_range[1] - left_range[0];
+        let right_dist = right_range[1] - right_range[0];
+        
+        if(left_dist > right_dist){
+          let min = left_range[0] + current_ship.ship_width/2;
+          let max = left_range[1];
+          let center_x = get_random_int(min, max);
+          current_ship.target_x = center_x;
+          
+        }
+        else{
+          let min = right_range[0];
+          let max = right_range[1] - current_ship.ship_width/2;
+          let center_x = get_random_int(min, max);
+          current_ship.target_x = center_x;
+          
+        }
+        
+        this.enemy_ships_move_counters[i] = 0;
+      }
+      else{
+        this.enemy_ships_move_counters[i] += 1;
+      }
+    }
   }
 
   get_usable_range() {
     let boundaries_list = [];
-    this.asteroid_list.forEach(asteroid => {
+    this.asteroid_list.forEach((asteroid) => {
       boundaries_list.push([asteroid.points[3].x, asteroid.points[1].x]);
-    })
-    this.enemy_ships_list.forEach(ship => {
+    });
+    this.enemy_ships_list.forEach((ship) => {
       let left_boundary = ship.center_x - ship.ship_width / 2;
       let right_boundary = ship.center_x + ship.ship_width / 2;
       boundaries_list.push([left_boundary, right_boundary]);
-    })
-    
+    });
+
     for (let i = 0; i < boundaries_list.length; i += 1) {
       for (let j = 0; j < boundaries_list.length - i - 1; j += 1) {
         let left_1 = boundaries_list[j][0];
@@ -1199,10 +1262,8 @@ class Game_field {
           boundaries_list[j] = boundaries_list[j + 1];
 
           boundaries_list[j + 1] = temp;
-          
         }
       }
-
     }
     let free_ranges = [];
     let running_x = 0;
@@ -1211,8 +1272,15 @@ class Game_field {
       running_x = boundaries_list[i][1];
     }
     free_ranges.push([running_x, canvas_width]);
-    
+
     return free_ranges;
+  }
+
+  increase_enemy_ships_hitpoints() {
+
+    this.enemy_ship_hitpoints += 1;
+    this.enemy_ship_hitpoints_increase_counter = 0;
+
   }
 
   apply_min_distance_on_ranges(min_distance, free_ranges) {
@@ -1228,7 +1296,14 @@ class Game_field {
     return new_ranges;
   }
 
-  draw_menu(attack_damage, attack_rate, attacks_per_valley, hitpoints, score, regen_rate) {
+  draw_menu(
+    attack_damage,
+    attack_rate,
+    attacks_per_valley,
+    hitpoints,
+    score,
+    regen_rate
+  ) {
     let vertical_space_between = 20;
     ctx.save();
     ctx.font = "14px sans-serif";
@@ -1256,7 +1331,12 @@ class Game_field {
     y_dist += vertical_space_between;
     ctx.fillText(`Hitpoints: ${hitpoints}`, canvas_width - 110, y_dist, 105);
     y_dist += vertical_space_between;
-    ctx.fillText(`Hp regen rate: ${regen_rate}`, canvas_width - 110, y_dist, 105);
+    ctx.fillText(
+      `Hp regen rate: ${regen_rate}`,
+      canvas_width - 110,
+      y_dist,
+      105
+    );
     y_dist += vertical_space_between;
     ctx.fillText(`Score: ${score}`, canvas_width - 110, y_dist, 105);
 
@@ -1274,8 +1354,6 @@ class Game_field {
         upgrade_code = get_random_int(1, end_code);
       }
       upgrade_codes.push(upgrade_code);
-
-
     }
     let upgrade_messages = {
       1: "Increase attack damage \nby 1",
@@ -1283,16 +1361,14 @@ class Game_field {
       3: "Increase the number of \nbullets per attack by 1",
       4: "Increase hitpoints \nby 2",
       5: "Increase hitpoint \nregeneration rate by 4s",
-      6: "Increase ship speed \nby 1"
-    }
+      6: "Increase ship speed \nby 1",
+    };
     let background_color = "hsl(0, 0%, 0%, 90%)";
     ctx.save();
     ctx.fillStyle = background_color;
 
     ctx.fillRect(0, 0, canvas_width, canvas_height);
-    let keys = [
-      "1", "2", "3"
-    ]
+    let keys = ["1", "2", "3"];
     ctx.restore();
     let line_color = "hsl(0, 0%, 86%)";
     let x_scale = round_to(canvas_width / number_of_upgrades_to_choose, 2);
@@ -1311,9 +1387,27 @@ class Game_field {
       let text_x_position = x_position - x_scale / 2;
 
       let text_y_position = 50;
-      drawString(ctx, `Press "${keys[i]}"`, text_x_position, text_y_position, "white", 0, "sans-serif", 14);
+      drawString(
+        ctx,
+        `Press "${keys[i]}"`,
+        text_x_position,
+        text_y_position,
+        "white",
+        0,
+        "sans-serif",
+        14
+      );
       text_y_position = canvas_height / 2;
-      drawString(ctx, upgrade_messages[upgrade_codes[i]], text_x_position, text_y_position, "white", 0, "sans-serif", 14);
+      drawString(
+        ctx,
+        upgrade_messages[upgrade_codes[i]],
+        text_x_position,
+        text_y_position,
+        "white",
+        0,
+        "sans-serif",
+        14
+      );
       ctx.restore();
       x_position += x_scale;
     }
@@ -1350,16 +1444,14 @@ class Game_field {
         this.start_frame_interval();
         this.bind_keys();
       }
-    }
+    };
   }
-  
-  increase_enemy_ships(){
-    
-    if(this.enemy_ships_on_field < this.enemy_ships_max){
+
+  increase_enemy_ships() {
+    if (this.enemy_ships_on_field < this.enemy_ships_max) {
       this.enemy_ships_on_field += 1;
       this.enemy_ships_increase_counter = 0;
     }
-    
   }
 
   check_timed_events() {
@@ -1386,8 +1478,12 @@ class Game_field {
       }
     }
 
-    if(this.enemy_ships_increase_counter === this.enemy_ships_increase_after){
+    if (this.enemy_ships_increase_counter === this.enemy_ships_increase_after) {
       this.increase_enemy_ships();
+    }
+
+    if (this.enemy_ship_hitpoints_increase_counter === this.enemy_ship_hitpoints_increase_after) {
+      this.increase_enemy_ships_hitpoints();
     }
   }
 
@@ -1400,9 +1496,9 @@ class Game_field {
 
   increase_asteroid_hitpoints() {
     this.increase_asteroid_hitpoints_counter = 0;
-    if (this.asteroid_hitpoints < this.asteroid_max_hitpoints) {
-      this.asteroid_hitpoints += 1;
-    }
+
+    this.asteroid_hitpoints += 1;
+
   }
 
   dispose_asteroids() {
@@ -1426,7 +1522,6 @@ class Game_field {
 
   handle_player_ship_collides_with_asteroids() {
     while (true) {
-
       let some_found = false;
       for (let i = 0; i < this.asteroid_list.length; i += 1) {
         let collide_bool = this.hitboxes_collide(
@@ -1446,160 +1541,188 @@ class Game_field {
         break;
       }
     }
-
   }
 
-  handle_player_bullets_with_enemy_bullets(){
-    while(true){
-
+  handle_player_bullets_with_enemy_bullets() {
+    while (true) {
       let some_found = false;
       let players_bullet_list = this.player_object.bullet_list;
-      for(let i = 0; i < this.enemy_ships_list.length; i += 1){
+      for (let i = 0; i < this.enemy_ships_list.length; i += 1) {
         let enemy_ship = this.enemy_ships_list[i];
         let enemy_bullet_list = enemy_ship.bullet_list;
-        for(let j = 0; j < enemy_bullet_list.length; j += 1){
+        for (let j = 0; j < enemy_bullet_list.length; j += 1) {
           let current_enemy_bullet = enemy_bullet_list[j];
           let current_enemy_bullet_hitboxes = current_enemy_bullet.hitboxes;
-          for(let k = 0; k < players_bullet_list.length; k += 1){
+          for (let k = 0; k < players_bullet_list.length; k += 1) {
             let current_player_bullet = players_bullet_list[k];
             let current_player_bullet_hitboxes = current_player_bullet.hitboxes;
-            let collides_bool = this.hitboxes_collide(current_player_bullet_hitboxes, current_enemy_bullet_hitboxes);
-            
-            if(collides_bool === true){
+            let collides_bool = this.hitboxes_collide(
+              current_player_bullet_hitboxes,
+              current_enemy_bullet_hitboxes
+            );
+
+            if (collides_bool === true) {
               some_found = true;
-              
+
               players_bullet_list.splice(k, 1);
               enemy_bullet_list.splice(j, 1);
               break;
             }
           }
-          if(some_found === true){
+          if (some_found === true) {
             break;
           }
         }
-        if(some_found === true){
+        if (some_found === true) {
           break;
         }
       }
-      if(some_found === false){
+      if (some_found === false) {
         break;
       }
     }
   }
 
-  handle_player_bullets_with_enemy_ships(){
-    while(true){
+  handle_player_bullets_with_enemy_ships() {
+    while (true) {
       let some_found = false;
       let players_bullet_list = this.player_object.bullet_list;
-      for(let i = 0; i < players_bullet_list.length; i += 1){
+      for (let i = 0; i < players_bullet_list.length; i += 1) {
         let current_player_bullet = players_bullet_list[i];
-        for(let j = 0; j < this.enemy_ships_list.length; j += 1){
+        for (let j = 0; j < this.enemy_ships_list.length; j += 1) {
           let current_enemy_ship = this.enemy_ships_list[j];
-          let collides_bool = this.hitboxes_collide(current_player_bullet.hitboxes, current_enemy_ship.hitboxes);
-          if(collides_bool === true){
+          let collides_bool = this.hitboxes_collide(
+            current_player_bullet.hitboxes,
+            current_enemy_ship.hitboxes
+          );
+          if (collides_bool === true) {
             some_found = true;
             current_enemy_ship.hitpoints -= current_player_bullet.damage;
-            if(current_enemy_ship.hitpoints <= 0){
+            if (current_enemy_ship.hitpoints <= 0) {
               this.enemy_ships_list.splice(j, 1);
+              this.enemy_ships_move_counters.splice(j, 1);
+              this.score += this.score_per_small_ship * this.enemy_ship_hitpoints;
             }
             players_bullet_list.splice(i, 1);
-            
           }
         }
-        if(some_found === true){
+        if (some_found === true) {
           break;
         }
       }
-      if(some_found === false){
+      if (some_found === false) {
         break;
       }
     }
   }
 
-  handle_enemy_bullets_with_player_ship(){
-    while(true){
+  handle_enemy_bullets_with_player_ship() {
+    while (true) {
       let some_found = false;
-      for(let i = 0; i < this.enemy_ships_list.length; i += 1){
+      for (let i = 0; i < this.enemy_ships_list.length; i += 1) {
         let current_enemy_ship = this.enemy_ships_list[i];
         let bullet_list = current_enemy_ship.bullet_list;
-        for(let j = 0; j < bullet_list.length; j += 1){
+        for (let j = 0; j < bullet_list.length; j += 1) {
           let current_bullet = bullet_list[j];
-          let collides_bool = this.hitboxes_collide(current_bullet.hitboxes, this.player_object.hitboxes);
-          if(collides_bool === true){
+          let collides_bool = this.hitboxes_collide(
+            current_bullet.hitboxes,
+            this.player_object.hitboxes
+          );
+          if (collides_bool === true) {
             some_found = true;
             bullet_list.splice(j, 1);
             this.player_object.hitpoints -= current_bullet.damage;
-            if(this.player_object.hitpoints <= 0){
+            if (this.player_object.hitpoints <= 0) {
               this.stop_frames();
             }
           }
-          if(some_found === true){
+          if (some_found === true) {
             break;
           }
         }
-        if(some_found === true){
+        if (some_found === true) {
           break;
         }
       }
-      if(some_found === false){
+      if (some_found === false) {
         break;
       }
     }
   }
 
-  dispose_entities(){
-
-  }
 
   generate_entities() {
     this.generate_enemy_ships();
     this.generate_asteroids();
   }
 
-  generate_enemy_ships(){
+  generate_enemy_ships() {
     let min = small_ship_width + 1;
     
-    for (let i = this.enemy_ships_list.length; i < this.enemy_ships_on_field; i += 1) {
-      
-      let ranges = this.get_usable_range();
-      
-      ranges = this.apply_min_distance_on_ranges(min, ranges);
-      
-      if(ranges.length > 0){
-        let range_index = get_random_int(0, ranges.length - 1);
-        let range = ranges[range_index];
-        
-        let choosable = [range[0] + min / 2, range[1] - min / 2];
-        
-        let center_x = get_random_int(choosable[0], choosable[1]);
-       
-        let ship = new Enemy_ship_small(center_x, -small_ship_height, canvas_width, canvas_height, this.enemy_ship_color, false, this.enemy_ship_hitpoints);
-        
-        this.enemy_ships_list.push(ship);
-        
+    if (this.enemy_ships_list.length < this.enemy_ships_on_field) {
+      if (
+        this.enemy_ship_spawn_cooldown_counter >= this.enemy_ship_spawn_cooldown
+      ) {
+        let ranges = this.get_usable_range();
+
+        ranges = this.apply_min_distance_on_ranges(min, ranges);
+
+        if (ranges.length > 0) {
+          let range_index = get_random_int(0, ranges.length - 1);
+          let range = ranges[range_index];
+
+          let choosable = [range[0] + min / 2, range[1] - min / 2];
+
+          let center_x = get_random_int(choosable[0], choosable[1]);
+
+          let ship = new Enemy_ship_small(
+            center_x,
+            -small_ship_height,
+            canvas_width,
+            canvas_height,
+            this.enemy_ship_color,
+            false,
+            this.enemy_ship_hitpoints
+          );
+
+          this.enemy_ships_list.push(ship);
+          this.enemy_ships_move_counters.push(0);
+          this.enemy_ship_spawn_cooldown_counter = 0;
+        }
+      }
+      else {
+        this.enemy_ship_spawn_cooldown_counter += 1;
       }
     }
   }
 
   generate_asteroids() {
-    
     let min = max_asteroid_length + 1;
-    for (let i = this.asteroid_list.length; i < this.max_asteroids_on_field; i += 1) {
-      
+    for (
+      let i = this.asteroid_list.length;
+      i < this.max_asteroids_on_field;
+      i += 1
+    ) {
       let ranges = this.get_usable_range();
-      
+
       ranges = this.apply_min_distance_on_ranges(min, ranges);
-      
-      if(ranges.length > 0){
+
+      if (ranges.length > 0) {
         let range_index = get_random_int(0, ranges.length - 1);
         let range = ranges[range_index];
-        
+
         let choosable = [range[0] + min / 2, range[1] - min / 2];
-        
+
         let center_x = get_random_int(choosable[0], choosable[1]);
-       
-        let asteroid = new Asteroid(center_x, -max_asteroid_length, canvas_width, canvas_height, this.asteroid_hitpoints);
-        
+
+        let asteroid = new Asteroid(
+          center_x,
+          -max_asteroid_length,
+          canvas_width,
+          canvas_height,
+          this.asteroid_hitpoints
+        );
+
         this.asteroid_list.push(asteroid);
       }
     }
@@ -1611,36 +1734,32 @@ class Game_field {
       for (let j = 0; j < hitbox_list_2.length; j += 1) {
         let temp2 = hitbox_list_2[j];
         let hitbox_1, hitbox_2;
-        if(temp1.left < temp2.left){
+        if (temp1.left < temp2.left) {
           hitbox_1 = temp1;
           hitbox_2 = temp2;
-        }
-        else{
+        } else {
           hitbox_1 = temp2;
           hitbox_2 = temp1;
         }
         let x_overlap_exists = false;
-        if(hitbox_2.left >= hitbox_1.left && hitbox_2.left <= hitbox_1.right){
+        if (hitbox_2.left >= hitbox_1.left && hitbox_2.left <= hitbox_1.right) {
           x_overlap_exists = true;
         }
-        if(temp1.top < temp2.top){
+        if (temp1.top < temp2.top) {
           hitbox_1 = temp1;
           hitbox_2 = temp2;
-        }
-        else{
+        } else {
           hitbox_1 = temp2;
           hitbox_2 = temp1;
         }
         let y_overlap_exists = false;
-        if(hitbox_2.top >= hitbox_1.top && hitbox_2.top <= hitbox_1.bottom){
+        if (hitbox_2.top >= hitbox_1.top && hitbox_2.top <= hitbox_1.bottom) {
           y_overlap_exists = true;
         }
-        
-        if(x_overlap_exists && y_overlap_exists === true){
+
+        if (x_overlap_exists && y_overlap_exists === true) {
           return true;
         }
-
-        
       }
     }
     return false;
@@ -1657,6 +1776,7 @@ class Game_field {
     this.upgrade_counter += 1;
     this.player_hp_regen_counter += 1;
     this.enemy_ships_increase_counter += 1;
+    this.enemy_ship_hitpoints_increase_counter += 1;
   }
 
   handle_player_ship_bullets_with_asteroids() {
@@ -1702,17 +1822,17 @@ class Game_field {
       this.increment_time_variables();
       this.frame_number = 0;
     }
-    
 
     ctx.clearRect(0, 0, this.canvas_width, this.canvas_height);
 
     this.player_object.on_frame(this.input_array, this.frame_number);
+    this.attempt_enemy_ships_move();
     this.asteroid_list.forEach((asteroid) => {
       asteroid.on_frame();
     });
-    this.enemy_ships_list.forEach(ship => {
+    this.enemy_ships_list.forEach((ship) => {
       ship.on_frame(this.frame_number);
-    })
+    });
     this.handle_player_ship_collides_with_asteroids();
     this.handle_player_ship_bullets_with_asteroids();
     this.handle_player_bullets_with_enemy_bullets();
@@ -1729,9 +1849,11 @@ class Game_field {
       this.player_hp_regen_after
     );
     this.check_timed_events();
-    
+
     let t1 = performance.now();
-    console.log(`frame took: ${t1 - t0} ms out of ${1000 / frame_rate} ms available`);
+    console.log(
+      `frame took: ${t1 - t0} ms out of ${1000 / frame_rate} ms available`
+    );
   }
 
   start_frame_interval() {
