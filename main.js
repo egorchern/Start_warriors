@@ -1,13 +1,135 @@
 let root = document.querySelector("#root");
+let loop_option = document.querySelector("#loop_option");
+let sfx_option = document.querySelector("#sfx_option");
 let ship_height = 40;
 let ship_width = 50;
 let small_ship_width = ship_width * 0.75;
 let small_ship_height = ship_height * 0.75;
 let max_asteroid_length = 45;
+let stroke_hitboxes = false;
+let loop_enabled;
+let sfx_enabled;
+let loop_track;
 let frame_rate = 60;
 let canvas, ctx;
 let canvas_width, canvas_height;
 //TODO remake into keyboard control
+
+function play_loop_music(){
+  if(loop_track === undefined && loop_enabled === true){
+    loop_track = new Howl({
+      src: ["sound/loop.mp3"],
+      autoplay: true,
+      loop: true,
+      volume: 0.6
+    });
+    loop_track.play();
+  }
+
+}
+
+function get_sfx_enabled(){
+  let temp = localStorage.getItem("sfx_enabled");
+  if(temp === undefined || temp === null){
+    temp = true;
+  }
+  else{
+    temp = JSON.parse(temp);
+  }
+  sfx_enabled = temp;
+}
+
+function bind_sfx_option(){
+  sfx_option.onclick = toggle_sfx_option;
+}
+
+function set_sfx_enabled(){
+  localStorage.setItem("sfx_enabled", JSON.stringify(sfx_enabled));
+}
+
+function toggle_sfx_option(){
+  sfx_enabled = !sfx_enabled;
+  set_sfx_enabled();
+  if(sfx_enabled === true){
+    sfx_option.src = "images/sfx_enabled.png";
+  }
+  else{
+    sfx_option.src = "images/sfx_disabled.png"
+  }
+
+}
+
+function bind_loop_option(){
+  
+  loop_option.onclick = toggle_loop_enabled;
+    
+}
+
+function toggle_loop_enabled(){
+  console.log(loop_enabled);
+  loop_enabled = !loop_enabled;
+  console.log(loop_enabled);
+  if(loop_enabled === true){
+    loop_option.src = "images/sound_enabled.png";
+    if(loop_track != undefined){
+      loop_track.play();
+    }
+  }
+  else{
+    loop_option.src = "images/sound_disabled.png";
+    if(loop_track != undefined){
+      loop_track.stop();
+    }
+  }
+
+  set_loop_enabled(loop_enabled);
+}
+
+function play_explosion_sound_effect(){
+  if(sfx_enabled === true){
+    let explosion = new Howl({
+      src: ["sound/explosion.wav"],
+      volume: 0.2
+    })
+    explosion.play();
+  }
+}
+
+function play_upgrade_sound_effect(){
+  if(sfx_enabled === true){
+    let upgrade = new Howl({
+      src: ["sound/upgrade.wav"],
+      volume: 0.3
+    })
+    upgrade.play();
+  }
+}
+
+function play_player_hit_sound_effect(){
+  if(sfx_enabled === true){
+    let hit = new Howl({
+      src: ["sound/hit.wav"],
+      volume: 0.2
+    })
+    hit.play();
+  }
+}
+
+function get_loop_enabled(){
+  let temp = localStorage.getItem("loop_enabled");
+  if(temp === undefined || temp === null){
+    temp = true;
+  }
+  else{
+    temp = JSON.parse(temp);
+  }
+  loop_enabled = temp;
+}
+
+function set_loop_enabled(value){
+  localStorage.setItem("loop_enabled", JSON.stringify(value));
+}
+
 function round_to(n, digits) {
   if (digits === undefined) {
     digits = 0;
@@ -58,7 +180,7 @@ function init_canvas() {
   let canv_width, canv_height;
   let wind_width = window.innerWidth;
   let wind_height = window.innerHeight;
-  canv_width = Math.min(550, wind_width * 0.95);
+  canv_width = Math.min(560, wind_width * 0.95);
   canv_height = Math.min(650, wind_height * 0.95);
   let canv_html = `
     <canvas id="canvas" width="${canv_width}" height="${canv_height}">
@@ -119,7 +241,7 @@ class Ship {
     this.left_wing_percentage = 0.2;
     this.radius = this.ship_height * 0.5 * (1 - this.wing_height_percentage);
     this.top_part_hitboxes_number = 3;
-    this.hitboxes_number_per_wing = 7;
+    this.hitboxes_number_per_wing = 8;
     this.speed = 6.5;
     this.bullets_per_valley = 1;
     this.fire_rate = 2;
@@ -678,7 +800,10 @@ class Ship {
     rest_of_ship.lineTo(this.points[6].x, this.points[6].y);
     rest_of_ship.lineTo(this.points[2].x, this.points[2].y);
     ctx.fill(rest_of_ship);
-    //this.stroke_hitboxes();
+    if(stroke_hitboxes === true){
+      this.stroke_hitboxes();
+    }
+    
     ctx.restore();
   }
 
@@ -719,7 +844,7 @@ class Asteroid {
     this.fill_color = "hsl(0, 2%, 28%)";
     this.points = [];
     this.hitboxes = [];
-    this.number_of_hitboxes_per_half = 6;
+    this.number_of_hitboxes_per_half = 8;
     this.generate_points();
     this.generate_hitboxes();
   }
@@ -912,7 +1037,9 @@ class Asteroid {
     ctx.save();
     ctx.fillStyle = this.fill_color;
     ctx.fill(asteroid_path);
-    //this.stroke_hitboxes();
+    if(stroke_hitboxes === true){
+      this.stroke_hitboxes();
+    }
     ctx.restore();
   }
 }
@@ -1047,7 +1174,9 @@ class Bullet {
     ctx.fillStyle = this.fill_color;
     ctx.fill(bullet_path);
 
-    //this.stroke_hitboxes();
+    if(stroke_hitboxes === true){
+      this.stroke_hitboxes();
+    }
     ctx.restore();
   }
 }
@@ -1124,7 +1253,10 @@ class Enemy_ship_small extends Ship {
     canvas_height,
     fill_color,
     facing_top,
-    hitpoints
+    hitpoints,
+    bullet_speed_multiplier,
+    fire_rate,
+    bullets_per_valley
   ) {
     super(canvas_width, canvas_height, fill_color, facing_top);
     this.center_x = center_x;
@@ -1132,9 +1264,10 @@ class Enemy_ship_small extends Ship {
     this.hitpoints = hitpoints;
     this.max_hitpoints = hitpoints;
     this.bullet_color = "hsl(120, 100%, 50%)";
-    this.bullet_speed = 0.4 * this.bullet_speed;
-    this.fire_rate = 1;
+    this.bullet_speed = bullet_speed_multiplier * this.bullet_speed;
+    this.fire_rate = fire_rate;
     this.speed = 0.5 * this.speed;
+    this.bullets_per_valley = bullets_per_valley;
     this.bullet_x_radius = 2.5;
     this.bullet_y_radius = 6.5;
     this.generate_points();
@@ -1150,7 +1283,7 @@ class Game_field {
     this.canvas_width = canvas.width;
     this.canvas_height = canvas.height;
     this.max_asteroids_on_field = 1;
-    this.max_asteroid_on_screen = 10;
+    this.max_asteroid_on_screen = 8;
     this.increase_asteroid_count_seconds = 15;
     this.seconds_elapsed = 0;
     this.increase_asteroids_counter = 0;
@@ -1163,7 +1296,7 @@ class Game_field {
     this.increase_asteroid_hitpoints_after = 30;
     this.player_hp_regen_after = 30;
     this.player_hp_regen_counter = 0;
-    this.upgrade_after = 40;
+    this.upgrade_after = 30;
     this.upgrade_counter = this.upgrade_after;
     this.score = 0;
     this.score_per_small_ship = 30;
@@ -1172,7 +1305,7 @@ class Game_field {
     this.enemy_ships_max = 3;
     this.enemy_ships_increase_after = 30;
     this.enemy_ships_increase_counter = 0;
-    this.enemy_ship_spawn_cooldown = 3 * frame_rate;
+    this.enemy_ship_spawn_cooldown = 2 * frame_rate;
     this.enemy_ship_spawn_cooldown_counter = 0;
     this.player_object = new Player_ship(
       this.canvas_width,
@@ -1185,8 +1318,21 @@ class Game_field {
     this.enemy_ship_hitpoints_increase_after = 20;
     this.enemy_ship_hitpoints_increase_counter = 0;
     this.enemy_ships_attempt_to_move_every = 3 * frame_rate;
+    this.enemy_ship_bullet_speed_multiplier = 0.4;
+    this.enemy_ship_bullet_speed_multiplier_max = 0.9;
+    this.enemy_ship_bullet_speed_multiplier_increase_after = 50;
+    this.enemy_ship_bullet_speed_multiplier_increase_counter = 0;
+    this.enemy_ship_fire_rate = 1;
+    this.enemy_ship_fire_rate_max = 6;
+    this.enemy_ship_fire_rate_increase_after = 50;
+    this.enemy_ship_fire_rate_increase_counter = 0;
+    this.enemy_ship_bullets_per_valley = 1;
+    this.enemy_ship_bullets_per_valley_max = 4;
+    this.enemy_ship_bullets_per_valley_increase_after = 50;
+    this.enemy_ship_bullets_per_valley_increase_counter = 0;
     this.enemy_ships_move_counters = [];
     this.enemy_ships_list = [];
+    this.score_per_second = 2;
     this.generate_entities();
     // in order: up, right, down, left, shoot
     this.input_array = [0, 0, 0, 0, 0];
@@ -1194,6 +1340,34 @@ class Game_field {
     this.bind_keys();
     this.on_frame = this.on_frame.bind(this);
     this.start_frame_interval();
+  }
+
+  handle_game_end(){
+    this.stop_frames();
+    ctx.save();
+    ctx.textAlign = "center";
+    let background_color = "hsl(0, 0%, 0%, 90%)";
+    ctx.fillStyle = background_color;
+    ctx.fillRect(0, 0, canvas_width, canvas_height);
+    let y = canvas_height / 2 - 80;
+    let x = canvas_width / 2;
+    let font_size = 28;
+    let y_increment = 40;
+    drawString(ctx, "Game Over", x, y, "white", 0, "sans-serif", font_size );
+    y += y_increment;
+    drawString(ctx, `Survived for: ${this.seconds_elapsed} seconds`, x, y, "white", 0, "sans-serif", font_size );
+    y += y_increment;
+    let final_score = this.score + this.seconds_elapsed * this.score_per_second;
+    drawString(ctx, `Final score: ${final_score}`, x, y, "white", 0, "sans-serif", font_size );
+    y += y_increment;
+    drawString(ctx, `Press R to restart`, x, y, "white", 0, "sans-serif", font_size );
+    ctx.restore();
+    window.onkeydown = (ev) => {
+      let key = ev.key;
+      if(key === "r"){
+        main();
+      }
+    }
   }
 
   attempt_enemy_ships_move(){
@@ -1239,6 +1413,27 @@ class Game_field {
       else{
         this.enemy_ships_move_counters[i] += 1;
       }
+    }
+  }
+
+  increase_enemy_ship_bullets_per_valley(){
+    if(this.enemy_ship_bullets_per_valley < this.enemy_ship_bullets_per_valley_max){
+      this.enemy_ship_bullets_per_valley += 1;
+      this.enemy_ship_bullets_per_valley_increase_counter = 0;
+    }
+  }
+
+  increase_enemy_ship_fire_rate(){
+    if(this.enemy_ship_fire_rate < this.enemy_ship_fire_rate_max){
+      this.enemy_ship_fire_rate += 1;
+      this.enemy_ship_fire_rate_increase_counter = 0;
+    }
+  }
+
+  increase_enemy_ship_bullet_speed_multiplier(){
+    if(this.enemy_ship_bullet_speed_multiplier < this.enemy_ship_bullet_speed_multiplier_max){
+      this.enemy_ship_bullet_speed_multiplier += 0.1;
+      this.enemy_ship_bullet_speed_multiplier_increase_counter = 0;
     }
   }
 
@@ -1347,6 +1542,7 @@ class Game_field {
     // upgrade codes: 1 - attack damage+, 2 - attack rate+, 3 - shots per attack+, 4 - hitpoints+, 5 - hitpoints regen+, 6 - ship speed+
     let upgrade_codes = [];
     let end_code = 6;
+    let font_size = 15;
     let number_of_upgrades_to_choose = 3;
     for (let i = 0; i < number_of_upgrades_to_choose; i += 1) {
       let upgrade_code = get_random_int(1, end_code);
@@ -1360,8 +1556,8 @@ class Game_field {
       2: "Increase attack rate \nby 1",
       3: "Increase the number of \nbullets per attack by 1",
       4: "Increase hitpoints \nby 2",
-      5: "Increase hitpoint \nregeneration rate by 4s",
-      6: "Increase ship speed \nby 1",
+      5: "Increase hitpoint \nregeneration rate by 4s\n(Min 1s)",
+      6: "Increase ship speed \nby 0.5",
     };
     let background_color = "hsl(0, 0%, 0%, 90%)";
     ctx.save();
@@ -1395,7 +1591,7 @@ class Game_field {
         "white",
         0,
         "sans-serif",
-        14
+        font_size
       );
       text_y_position = canvas_height / 2;
       drawString(
@@ -1406,7 +1602,7 @@ class Game_field {
         "white",
         0,
         "sans-serif",
-        14
+        font_size
       );
       ctx.restore();
       x_position += x_scale;
@@ -1416,6 +1612,7 @@ class Game_field {
     window.onkeydown = (e) => {
       let key = e.key;
       let index = find_index(keys, key);
+      play_loop_music();
       if (index != -1) {
         let upgrade_code = upgrade_codes[index];
         switch (upgrade_code) {
@@ -1434,13 +1631,21 @@ class Game_field {
             this.player_object.max_hitpoints += 2;
             break;
           case 5:
-            this.player_hp_regen_after -= 4;
+            let end_result = this.player_hp_regen_after - 4;
+            if(end_result >= 1){ 
+              this.player_hp_regen_after -= 4;
+            }
+            else{
+              this.player_hp_regen_after = 1;
+            }
+            
             break;
           case 6:
-            this.player_object.speed += 1;
+            this.player_object.speed += 0.5;
             break;
         }
         this.upgrade_counter = 0;
+        play_upgrade_sound_effect();
         this.start_frame_interval();
         this.bind_keys();
       }
@@ -1471,11 +1676,13 @@ class Game_field {
     if (this.upgrade_counter === this.upgrade_after) {
       this.handle_upgrade();
     }
-
+    
     if (this.player_hp_regen_counter === this.player_hp_regen_after) {
       if (this.player_object.hitpoints < this.player_object.max_hitpoints) {
         this.player_object.hitpoints += 1;
+        
       }
+      this.player_hp_regen_counter = 0;
     }
 
     if (this.enemy_ships_increase_counter === this.enemy_ships_increase_after) {
@@ -1484,6 +1691,18 @@ class Game_field {
 
     if (this.enemy_ship_hitpoints_increase_counter === this.enemy_ship_hitpoints_increase_after) {
       this.increase_enemy_ships_hitpoints();
+    }
+
+    if(this.enemy_ship_bullet_speed_multiplier_increase_counter === this.enemy_ship_bullet_speed_multiplier_increase_after){
+      this.increase_enemy_ship_bullet_speed_multiplier();
+    }
+
+    if(this.enemy_ship_fire_rate_increase_counter === this.enemy_ship_fire_rate_increase_after){
+      this.increase_enemy_ship_fire_rate();
+    }
+
+    if(this.enemy_ship_bullets_per_valley_increase_counter === this.enemy_ship_bullets_per_valley_increase_after){
+      this.increase_enemy_ship_bullets_per_valley();
     }
   }
 
@@ -1529,11 +1748,12 @@ class Game_field {
           this.asteroid_list[i].hitboxes
         );
         if (collide_bool === true) {
+          play_player_hit_sound_effect();
           some_found = true;
           this.player_object.hitpoints -= 1;
           this.asteroid_list.splice(i, 1);
           if (this.player_object.hitpoints <= 0) {
-            this.stop_frames();
+            this.handle_game_end();
           }
         }
       }
@@ -1563,8 +1783,11 @@ class Game_field {
 
             if (collides_bool === true) {
               some_found = true;
-
-              players_bullet_list.splice(k, 1);
+              current_player_bullet.damage -= 1;
+              if(current_player_bullet.damage <= 0){
+                players_bullet_list.splice(k, 1);
+              }
+              
               enemy_bullet_list.splice(j, 1);
               break;
             }
@@ -1598,10 +1821,15 @@ class Game_field {
           if (collides_bool === true) {
             some_found = true;
             current_enemy_ship.hitpoints -= current_player_bullet.damage;
+
             if (current_enemy_ship.hitpoints <= 0) {
+              play_explosion_sound_effect();
               this.enemy_ships_list.splice(j, 1);
               this.enemy_ships_move_counters.splice(j, 1);
               this.score += this.score_per_small_ship * this.enemy_ship_hitpoints;
+            }
+            else{
+              play_player_hit_sound_effect();
             }
             players_bullet_list.splice(i, 1);
           }
@@ -1629,11 +1857,12 @@ class Game_field {
             this.player_object.hitboxes
           );
           if (collides_bool === true) {
+            play_player_hit_sound_effect();
             some_found = true;
             bullet_list.splice(j, 1);
             this.player_object.hitpoints -= current_bullet.damage;
             if (this.player_object.hitpoints <= 0) {
-              this.stop_frames();
+              this.handle_game_end();
             }
           }
           if (some_found === true) {
@@ -1682,7 +1911,10 @@ class Game_field {
             canvas_height,
             this.enemy_ship_color,
             false,
-            this.enemy_ship_hitpoints
+            this.enemy_ship_hitpoints,
+            this.enemy_ship_bullet_speed_multiplier,
+            this.enemy_ship_fire_rate,
+            this.enemy_ship_bullets_per_valley
           );
 
           this.enemy_ships_list.push(ship);
@@ -1777,6 +2009,8 @@ class Game_field {
     this.player_hp_regen_counter += 1;
     this.enemy_ships_increase_counter += 1;
     this.enemy_ship_hitpoints_increase_counter += 1;
+    this.enemy_ship_bullet_speed_multiplier_increase_counter += 1;
+    this.enemy_ship_bullets_per_valley_increase_counter += 1;
   }
 
   handle_player_ship_bullets_with_asteroids() {
@@ -1798,10 +2032,14 @@ class Game_field {
             local_player_ship_bullet_list.splice(i, 1);
 
             if (current_asteroid.hitpoints <= 0) {
+              play_explosion_sound_effect();
               this.score += this.points_per_asteroid * this.asteroid_hitpoints;
               some_found = true;
               this.asteroid_list.splice(j, 1);
               break;
+            }
+            else{
+              play_player_hit_sound_effect();
             }
           }
         }
@@ -1816,7 +2054,7 @@ class Game_field {
   }
 
   on_frame() {
-    let t0 = performance.now();
+    
     this.frame_number += 1;
     if (this.frame_number > frame_rate) {
       this.increment_time_variables();
@@ -1850,10 +2088,7 @@ class Game_field {
     );
     this.check_timed_events();
 
-    let t1 = performance.now();
-    console.log(
-      `frame took: ${t1 - t0} ms out of ${1000 / frame_rate} ms available`
-    );
+    
   }
 
   start_frame_interval() {
@@ -1863,8 +2098,9 @@ class Game_field {
 
   bind_keys() {
     window.onkeydown = (ev) => {
-      let key = ev.key;
 
+      let key = ev.key;
+      play_loop_music();
       if (key === "w") {
         this.input_array[0] = 1;
       }
@@ -1880,9 +2116,7 @@ class Game_field {
       if (key === "space") {
         this.input_array[4] = 1;
       }
-      if (key === "1") {
-        this.stop_frames();
-      }
+      
     };
     window.onkeyup = (ev) => {
       let key = ev.key;
@@ -1906,9 +2140,32 @@ class Game_field {
   }
 }
 
-function main() {
-  init_canvas();
+function handle_sound(){
+  get_loop_enabled();
+  if(loop_enabled === true){
+    loop_option.src = "images/sound_enabled.png";
+  }
+  else{
+    loop_option.src = "images/sound_disabled.png";
+  }
+  bind_loop_option();
+  get_sfx_enabled();
+  if(sfx_enabled === true){
+    sfx_option.src = "images/sfx_enabled.png";
+  }
+  else{
+    sfx_option.src = "images/sfx_disabled.png"
+  }
+  bind_sfx_option();
+}
 
+function main() {
+  
+  init_canvas();
+  
+  
   let game_field = new Game_field(canvas);
 }
+handle_sound();
+
 main();

@@ -17,6 +17,27 @@ body, html{
     align-items: center;
     justify-content: center;
 }
+.sound_container{
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+.sound{
+    width: 41px;
+    height: 41px;
+
+    margin: 6px;
+    cursor: pointer;
+    padding: 4px;
+    transition: box-shadow 0.2s ease-in-out;
+}
+.sound:hover{
+    box-shadow: 0px 0px 5px 3px hsl(203, 84%, 60%);
+}
 #canvas{
     border: 1px solid black;
     
